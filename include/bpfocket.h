@@ -2,6 +2,7 @@
 #define BPFOCKET_H
 
 
+#include <sys/ioctl.h>     // ioctl()
 #include <sys/socket.h>    // socket()
 #include <net/if.h>        // struct ifconf, struct ifreq 
 #include <net/if_arp.h>    // ARPHDR_ETHER
@@ -15,6 +16,15 @@
 #define __BPFOCKET_END   }
 
 __BPFOCKET_BEGIN
+namespace utils
+{
+    enum class eResultCode
+    {
+        Success = 0,
+        Failure = 10,
+    };
+}  // ::bpfocket::utils
+
 namespace filter
 {
 
@@ -34,18 +44,19 @@ namespace core
         RawSocket(RawSocket&&) = delete;
         RawSocket& operator=(RawSocket&&) = delete;
     public:
+        const int fd() const;
         const ssize_t err() const;
 
     private:
         const ssize_t create();
     private:
-        int sockfd_;
+        int fd_;
 
         ssize_t err_;
     };
 
     RawSocket::RawSocket()
-        : sockfd_{}
+        : fd_{}
         , err_{}
     {
         if (create() < 0)
@@ -56,7 +67,12 @@ namespace core
 
     RawSocket::~RawSocket()
     {
-        close(sockfd_);
+        close(fd_);
+    }
+
+    const int RawSocket::fd() const
+    {
+        return fd_;
     }
 
     const ssize_t RawSocket::err() const
@@ -66,8 +82,8 @@ namespace core
 
     const ssize_t RawSocket::create()
     {
-        sockfd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-        if (sockfd_ < 0)
+        fd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+        if (fd_ < 0)
         {
             err_ = errno;
             return -1;
