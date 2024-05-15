@@ -6,6 +6,6 @@ docker run `
     -v ${pwd}:/app `
     --net=host `
     --cap-add=NET_ADMIN `
-    --name bpfackman-cpp_dev `
+    --name BPFocket-cpp_dev `
     jhleeeme/cpp:dev `
     bin/bash
