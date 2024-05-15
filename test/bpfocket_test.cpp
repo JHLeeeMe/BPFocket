@@ -1,11 +1,13 @@
 /// bpfocket_test.cpp
 ///
 
+#include <fcntl.h>  // fcntl()
+
 #include "gtest/gtest.h"
 
 #include "bpfocket.h"
 
-TEST(sys, ioctl)
+TEST(ioctl, SIOCGIFCONF)
 {  // ::ioctl
     using namespace ::bpfocket;
 
@@ -40,38 +42,48 @@ TEST(sys, ioctl)
     }
 }
 
-TEST(utils, eResultCode)
-{  // ::bpfocket::utils
-    using namespace ::bpfocket;
-
-    ASSERT_EQ(0, static_cast<int>(utils::eResultCode::Success));
-    ASSERT_EQ(10, static_cast<int>(utils::eResultCode::Failure));
-}
-
-TEST(core, RawSocket)
+TEST(RawSocket, rule_of_X)
 {  // ::bpfocket::core
     using namespace ::bpfocket;
 
-    core::RawSocket sockfd{};
-    ASSERT_EQ(typeid(sockfd), typeid(core::RawSocket));
+    core::RawSocket sock{};
+    ASSERT_EQ(typeid(sock), typeid(core::RawSocket));
+
+    errno = 0;
+    int fd_tmp{};
+    { // destructor
+        core::RawSocket sock_tmp{};
+        fd_tmp = sock_tmp.fd();
+        ASSERT_NE(0, fd_tmp);
+        ASSERT_NE(-1, fcntl(fd_tmp, F_GETFD));
+        ASSERT_NE(EBADF, errno);
+    }
+    ASSERT_EQ(-1, fcntl(fd_tmp, F_GETFD));
+    ASSERT_EQ(EBADF, errno);
 
     {  /// Compile error
         /// copy constructor
-        // core::RawSocket sockfd_copy{ sockfd };
-
-        /// copy operator
-        // core::RawSocket sockfd_copy_op{};
-        // sockfd_copy_op = sockfd;
+        // core::RawSocket sock_copy{ sockfd };
+        /// copy assignment operator
+        // core::RawSocket sock_copy_op{};
+        // sock_copy_op = sock;
 
         /// move constructor
-        // core::RawSocket sockfd_move{ std::move(sockfd) };
-
-        /// move operator
-        // core::RawSocket sockfd_move_op{};
-        // sockfd_move_op = std::move(sockfd);
+        // core::RawSocket sock_move{ std::move(sock) };
+        /// move assignment operator
+        // core::RawSocket sock_move_op{};
+        // sock_move_op = std::move(sock);
     }
 
     {  // err()
-        ASSERT_EQ(0, sockfd.err());
+        ASSERT_EQ(0, sock.err());
     }
+}
+
+TEST(RawSocket, set_ifname)
+{  // ::bpfocket::core
+    using namespace ::bpfocket;
+
+    core::RawSocket sock{};
+    ASSERT_NE(std::string(), sock.ifname());
 }
