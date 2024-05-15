@@ -1,4 +1,4 @@
-/// sysv_mq_test.cpp
+/// bpfocket_test.cpp
 ///
 
 #include "gtest/gtest.h"
