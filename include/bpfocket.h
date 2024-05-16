@@ -27,6 +27,45 @@ namespace utils
         IoctlFailed       = Failure + 1,  // 101
         InterfaceNotFound = Failure + 2,  // 102
     };
+
+    [[noreturn]]
+    void throwRuntimeError(eResultCode code,
+                           const ssize_t err_no,
+                           const std::string& caller_info,
+                           const std::string& msg = "")
+    {
+        std::string error_message{
+            "Error occurred in " + caller_info + ":\n\t"};
+
+        if (!msg.empty())
+        {
+            error_message += msg;
+        }
+
+        error_message += " [code: ";
+        switch (code)
+        {
+        case eResultCode::IoctlFailed:
+            error_message += "IoctlFailed";
+            break;
+        case eResultCode::InterfaceNotFound:
+            error_message += "InterfaceNotFound";
+            break;
+        default:
+            error_message += "Failure";
+            break;
+        }
+        error_message += "]";
+
+        if (err_no != 0)
+        {
+            error_message += "[errno: ";
+            error_message += std::to_string(err_no);
+            error_message += "]";
+        }
+
+        throw std::runtime_error(error_message);
+    }
 }  // ::bpfocket::utils
 
 namespace filter
