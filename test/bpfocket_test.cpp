@@ -7,7 +7,7 @@
 
 #include "bpfocket.h"
 
-TEST(ioctl, SIOCGIFCONF)
+TEST(ioctl, getconf)
 {  // ::ioctl
     using namespace ::bpfocket;
 
@@ -61,7 +61,7 @@ TEST(RawSocket, rule_of_X)
     ASSERT_EQ(-1, fcntl(fd_tmp, F_GETFD));
     ASSERT_EQ(EBADF, errno);
 
-    {  /// Compile error
+    {  // Compile error
         /// copy constructor
         // core::RawSocket sock_copy{ sockfd };
         /// copy assignment operator
@@ -82,8 +82,24 @@ TEST(RawSocket, rule_of_X)
 
 TEST(RawSocket, set_ifname)
 {  // ::bpfocket::core
+    /// set_ifname() is exec in constructor
+    ///
+
     using namespace ::bpfocket;
 
     core::RawSocket sock{};
     ASSERT_NE(std::string(), sock.ifname());
+}
+
+TEST(throwRuntimeError, all)
+{  // ::bpfocket::utils
+    using namespace ::bpfocket;
+
+    ssize_t err_no = 1;
+
+    ASSERT_THROW(
+        utils::throwRuntimeError(
+            utils::eResultCode::Failure, err_no, __FUNCTION__),
+        std::runtime_error
+    );
 }
