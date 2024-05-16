@@ -60,7 +60,7 @@ namespace core
         auto create_fd()  -> utils::eResultCode;
         auto set_ifname() -> utils::eResultCode;
         auto find_eth_ifr(const struct ifconf& ifc)
-            -> std::pair<utils::eResultCode, struct ifreq>;
+                -> std::pair<utils::eResultCode, struct ifreq>;
     private:
         int fd_;
         std::string ifname_;
@@ -81,9 +81,17 @@ namespace utils
         Success = 0,
 
         Failure           = 100,
-        IoctlFailed       = Failure + 1,  // 101
-        InterfaceNotFound = Failure + 2,  // 102
-        FdCreationFailed  = Failure + 3,  // 103
+        InterfaceNotFound = Failure + 1,  // 101
+
+        IoctlFailureBase     = 200,
+        IoctlGetConfigFailed = IoctlFailureBase + 1,  // 201
+        IoctlGetFlagsFailed  = IoctlFailureBase + 2,  // 202
+        IoctlSetFlagsFailed  = IoctlFailureBase + 3,  // 203
+        IoctlGetHwAddrFailed = IoctlFailureBase + 4,  // 204
+
+        SocketFailureBase     = 300,
+        SocketCreationFailed  = SocketFailureBase + 1,  // 301
+        SocketSetOptFailed    = SocketFailureBase + 2,  // 302
     };
 
     [[noreturn]]
@@ -92,37 +100,22 @@ namespace utils
                            const std::string& caller_info,
                            const std::string& msg)
     {
-        std::string error_message{
-            "Error occurred in " + caller_info + ":\n\t"};
+        std::ostringstream oss{};
+        oss << "Error occurred in " << caller_info << ":\n\t";
 
         if (!msg.empty())
         {
-            error_message += msg;
+            oss << msg;
         }
 
-        error_message += " [code: ";
-        switch (code)
-        {
-        case eResultCode::IoctlFailed:
-            error_message += "IoctlFailed";
-            break;
-        case eResultCode::InterfaceNotFound:
-            error_message += "InterfaceNotFound";
-            break;
-        default:
-            error_message += "Failure";
-            break;
-        }
-        error_message += "]";
+        oss << " [code: " << static_cast<uint32_t>(code) << "]";
 
         if (err_no != 0)
         {
-            error_message += "[errno: ";
-            error_message += std::to_string(err_no);
-            error_message += "]";
+            oss << "[errno: " << err_no << "]";
         }
 
-        throw std::runtime_error(error_message);
+        throw std::runtime_error(oss.str());
     }
 }  // ::bpfocket::utils
 
@@ -177,7 +170,7 @@ namespace core
         if (fd_ < 0)
         {
             err_ = errno;
-            return utils::eResultCode::FdCreationFailed;
+            return utils::eResultCode::SocketCreationFailed;
         }
 
         return utils::eResultCode::Success;
@@ -190,7 +183,7 @@ namespace core
         if (::ioctl(fd_, SIOCGIFCONF, &ifc) < 0)
         {
             err_ = errno;
-            return utils::eResultCode::IoctlFailed;
+            return utils::eResultCode::IoctlGetConfigFailed;
         }
 
         std::vector<char> buf(ifc.ifc_len);
@@ -199,7 +192,7 @@ namespace core
         if (::ioctl(fd_, SIOCGIFCONF, &ifc) < 0)
         {
             err_ = errno;
-            return utils::eResultCode::IoctlFailed;
+            return utils::eResultCode::IoctlGetConfigFailed;
         }
 
         std::pair<utils::eResultCode, struct ifreq> result{ find_eth_ifr(ifc) };
@@ -230,7 +223,7 @@ namespace core
             if (::ioctl(fd_, SIOCGIFFLAGS, &ifr[i]) < 0)
             {
                 err_ = errno;
-                return { utils::eResultCode::IoctlFailed, {} };
+                return { utils::eResultCode::IoctlGetFlagsFailed, {} };
             }
 
             if ((ifr[i].ifr_flags & IFF_LOOPBACK) ||
@@ -243,7 +236,7 @@ namespace core
             if (::ioctl(fd_, SIOCGIFHWADDR, &ifr[i]) < 0)
             {
                 err_ = errno;
-                return { utils::eResultCode::IoctlFailed, {} };
+                return { utils::eResultCode::IoctlGetHwAddrFailed, {} };
             }
 
             if (ifr[i].ifr_hwaddr.sa_family != ARPHRD_ETHER)
