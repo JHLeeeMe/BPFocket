@@ -11,12 +11,69 @@
 #include <unistd.h>        // close()
 
 #include <stdexcept>  // runtime_error()
-#include <optional>   // std::optional
+#include <utility>    // std::pair<>
 
 #define __BPFOCKET_BEGIN namespace bpfocket {
 #define __BPFOCKET_END   }
 
 __BPFOCKET_BEGIN
+
+/// ============================================================================
+/// Declarations
+/// ============================================================================
+
+namespace utils
+{
+    enum class eResultCode;
+
+    [[noreturn]]
+    void throwRuntimeError(eResultCode code,
+                           const ssize_t err_no,
+                           const std::string& caller_info,
+                           const std::string& msg = "");
+}  // ::bpfocket::utils
+
+namespace filter
+{
+
+}  // ::bpfocket::filter
+
+namespace core
+{
+    class RawSocket
+    {
+    public:  // rule of 5
+        RawSocket();
+        ~RawSocket();
+
+        RawSocket(const RawSocket&) = delete;
+        RawSocket& operator=(const RawSocket&) = delete;
+
+        RawSocket(RawSocket&&) = delete;
+        RawSocket& operator=(RawSocket&&) = delete;
+    public:
+        auto fd()     const -> const int;
+        auto ifname() const -> std::string;
+        auto err()    const -> const ssize_t;
+
+    private:
+        auto create_fd()  -> utils::eResultCode;
+        auto set_ifname() -> utils::eResultCode;
+        auto find_eth_ifr(const struct ifconf& ifc)
+            -> std::pair<utils::eResultCode, struct ifreq>;
+    private:
+        int fd_;
+        std::string ifname_;
+
+        ssize_t err_;
+    };
+}  // ::bpfocket::core
+
+
+/// ============================================================================
+/// Definitions
+/// ============================================================================
+
 namespace utils
 {
     enum class eResultCode
@@ -26,13 +83,14 @@ namespace utils
         Failure           = 100,
         IoctlFailed       = Failure + 1,  // 101
         InterfaceNotFound = Failure + 2,  // 102
+        FdCreationFailed  = Failure + 3,  // 103
     };
 
     [[noreturn]]
     void throwRuntimeError(eResultCode code,
                            const ssize_t err_no,
                            const std::string& caller_info,
-                           const std::string& msg = "")
+                           const std::string& msg)
     {
         std::string error_message{
             "Error occurred in " + caller_info + ":\n\t"};
@@ -75,47 +133,21 @@ namespace filter
 
 namespace core
 {
-    class RawSocket
-    {
-    public:  // rule of 5
-        RawSocket();
-        ~RawSocket();
-
-        RawSocket(const RawSocket&) = delete;
-        RawSocket& operator=(const RawSocket&) = delete;
-
-        RawSocket(RawSocket&&) = delete;
-        RawSocket& operator=(RawSocket&&) = delete;
-    public:
-        auto fd()     const -> const int;
-        auto ifname() const -> std::string;
-        auto err()    const -> const ssize_t;
-
-    private:
-        auto create()     -> const ssize_t;
-        auto set_ifname() -> utils::eResultCode;
-        auto find_eth_ifr(const struct ifconf& ifc)
-            -> std::pair<utils::eResultCode, struct ifreq>;
-    private:
-        int fd_;
-        std::string ifname_;
-
-        ssize_t err_;
-    };
-
     RawSocket::RawSocket()
         : fd_{}
         , ifname_{}
         , err_{}
     {
-        if (create() < 0)
+        utils::eResultCode code{};
+
+        if ((code = create_fd()) != utils::eResultCode::Success)
         {
-            std::runtime_error("To do");
+            utils::throwRuntimeError(code, err_, __FUNCTION__, "create_fd()");
         }
 
-        if (set_ifname() != utils::eResultCode::Success)
+        if ((code = set_ifname()) != utils::eResultCode::Success)
         {
-            std::runtime_error("To do");
+            utils::throwRuntimeError(code, err_, __FUNCTION__, "set_ifname()");
         }
     }
 
@@ -139,16 +171,16 @@ namespace core
         return err_;
     }
 
-    auto RawSocket::create() -> const ssize_t
+    auto RawSocket::create_fd() -> utils::eResultCode
     {
         fd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
         if (fd_ < 0)
         {
             err_ = errno;
-            return -1;
+            return utils::eResultCode::FdCreationFailed;
         }
 
-        return 0;
+        return utils::eResultCode::Success;
     }
 
     auto RawSocket::set_ifname() -> utils::eResultCode
