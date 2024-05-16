@@ -48,15 +48,15 @@ namespace core
         RawSocket(RawSocket&&) = delete;
         RawSocket& operator=(RawSocket&&) = delete;
     public:
-        const int fd() const;
-        std::string ifname() const;
-        const ssize_t err() const;
+        auto fd()     const -> const int;
+        auto ifname() const -> std::string;
+        auto err()    const -> const ssize_t;
 
     private:
-        const ssize_t create();
-        utils::eResultCode set_ifname();
+        auto create()     -> const ssize_t;
+        auto set_ifname() -> utils::eResultCode;
         auto find_eth_ifr(const struct ifconf& ifc)
-            -> std::optional<struct ifreq>;
+            -> std::pair<utils::eResultCode, struct ifreq>;
     private:
         int fd_;
         std::string ifname_;
@@ -85,22 +85,22 @@ namespace core
         close(fd_);
     }
 
-    const int RawSocket::fd() const
+    auto RawSocket::fd() const -> const int
     {
         return fd_;
     }
 
-    std::string RawSocket::ifname() const
+    auto RawSocket::ifname() const -> std::string
     {
         return ifname_;
     }
 
-    const ssize_t RawSocket::err() const
+    auto RawSocket::err() const -> const ssize_t
     {
         return err_;
     }
 
-    const ssize_t RawSocket::create()
+    auto RawSocket::create() -> const ssize_t
     {
         fd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
         if (fd_ < 0)
@@ -112,7 +112,7 @@ namespace core
         return 0;
     }
 
-    utils::eResultCode RawSocket::set_ifname()
+    auto RawSocket::set_ifname() -> utils::eResultCode
     {
         struct ifconf ifc{};
 
@@ -122,9 +122,7 @@ namespace core
             return utils::eResultCode::IoctlFailed;
         }
 
-        std::vector<char> buf{};
-        buf.reserve(ifc.ifc_len);
-        buf.resize(ifc.ifc_len);
+        std::vector<char> buf(ifc.ifc_len);
         ifc.ifc_buf = buf.data();
 
         if (::ioctl(fd_, SIOCGIFCONF, &ifc) < 0)
@@ -133,26 +131,27 @@ namespace core
             return utils::eResultCode::IoctlFailed;
         }
 
-        std::optional<struct ifreq> result{ find_eth_ifr(ifc) };
-        if (!result)
+        std::pair<utils::eResultCode, struct ifreq> result{ find_eth_ifr(ifc) };
+        utils::eResultCode code{ result.first };
+        if (code != utils::eResultCode::Success)
         {
-            if (err_ == 0)  // interface not found.
+            if (code == utils::eResultCode::InterfaceNotFound)
             {
-                return utils::eResultCode::InterfaceNotFound;
+                err_ = 0;
             }
-            return utils::eResultCode::IoctlFailed;
+
+            return code;
         }
 
-        struct ifreq eth_ifr{ result.value() };
+        struct ifreq eth_ifr{ result.second };
         ifname_ = eth_ifr.ifr_name;
 
         return utils::eResultCode::Success;
     }
 
     auto RawSocket::find_eth_ifr(const struct ifconf& ifc)
-        -> std::optional<struct ifreq>
+            -> std::pair<utils::eResultCode, struct ifreq>
     {
-        err_ = 0;
         struct ifreq* ifr{ ifc.ifc_req };
 
         for (size_t i = 0; i < ifc.ifc_len / sizeof(struct ifreq); i++)
@@ -160,7 +159,7 @@ namespace core
             if (::ioctl(fd_, SIOCGIFFLAGS, &ifr[i]) < 0)
             {
                 err_ = errno;
-                return std::nullopt;
+                return { utils::eResultCode::IoctlFailed, {} };
             }
 
             if ((ifr[i].ifr_flags & IFF_LOOPBACK) ||
@@ -173,7 +172,7 @@ namespace core
             if (::ioctl(fd_, SIOCGIFHWADDR, &ifr[i]) < 0)
             {
                 err_ = errno;
-                return std::nullopt;
+                return { utils::eResultCode::IoctlFailed, {} };
             }
 
             if (ifr[i].ifr_hwaddr.sa_family != ARPHRD_ETHER)
@@ -185,11 +184,11 @@ namespace core
             if (eth_ifr_name.find("eth") != std::string::npos ||
                 eth_ifr_name.find("en") != std::string::npos)
             {
-                return ifr[i];
+                return { utils::eResultCode::Success, ifr[i] };
             }
         }
 
-        return std::nullopt;
+        return { utils::eResultCode::InterfaceNotFound, {} };
     }
 }  // ::bpfocket::core
 __BPFOCKET_END
