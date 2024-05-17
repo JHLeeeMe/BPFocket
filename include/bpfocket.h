@@ -43,7 +43,7 @@ namespace core
     class RawSocket
     {
     public:  // rule of 5
-        RawSocket();
+        RawSocket(const bool promisc = false);
         ~RawSocket();
 
         RawSocket(const RawSocket&) = delete;
@@ -52,18 +52,25 @@ namespace core
         RawSocket(RawSocket&&) = delete;
         RawSocket& operator=(RawSocket&&) = delete;
     public:
-        auto fd()     const -> const int;
+        auto fd()     const -> int;
         auto ifname() const -> std::string;
-        auto err()    const -> const ssize_t;
+        auto err()    const -> ssize_t;
 
     private:
-        auto create_fd()  -> utils::eResultCode;
-        auto set_ifname() -> utils::eResultCode;
-        auto find_eth_ifr(const struct ifconf& ifc)
+        auto create_fd()   -> utils::eResultCode;
+        auto set_ifname()  -> utils::eResultCode;
+        auto set_promisc() -> utils::eResultCode;
+        auto set_ifflags(const int16_t flag) -> utils::eResultCode;
+        auto get_ifflags()
+                -> std::pair<utils::eResultCode, int16_t>;
+        auto get_eth_ifr(const struct ifconf& ifc)
                 -> std::pair<utils::eResultCode, struct ifreq>;
     private:
         int fd_;
-        std::string ifname_;
+
+        struct ifreq ifr_;
+        std::string  ifname_;
+        int16_t      ifflags_orig_;
 
         ssize_t err_;
     };
@@ -89,9 +96,9 @@ namespace utils
         IoctlSetFlagsFailed  = IoctlFailureBase + 3,  // 203
         IoctlGetHwAddrFailed = IoctlFailureBase + 4,  // 204
 
-        SocketFailureBase     = 300,
-        SocketCreationFailed  = SocketFailureBase + 1,  // 301
-        SocketSetOptFailed    = SocketFailureBase + 2,  // 302
+        SocketFailureBase    = 300,
+        SocketCreationFailed = SocketFailureBase + 1,  // 301
+        SocketSetOptFailed   = SocketFailureBase + 2,  // 302
     };
 
     [[noreturn]]
@@ -130,9 +137,11 @@ namespace core
     /// Rule of X
     /// ========================================================================
 
-    RawSocket::RawSocket()
-        : fd_{}
+    RawSocket::RawSocket(const bool promisc)
+        : fd_{ -1 }
+        , ifr_{}
         , ifname_{}
+        , ifflags_orig_{}
         , err_{}
     {
         utils::eResultCode code{};
@@ -142,14 +151,42 @@ namespace core
             utils::throwRuntimeError(code, err_, __FUNCTION__, "create_fd()");
         }
 
-        if ((code = set_ifname()) != utils::eResultCode::Success)
+        try
         {
-            utils::throwRuntimeError(code, err_, __FUNCTION__, "set_ifname()");
+            if ((code = set_ifname()) != utils::eResultCode::Success)
+            {
+                utils::throwRuntimeError(
+                    code, err_, __FUNCTION__, "set_ifname()");
+            }
+
+            std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
+            if ((code = result.first) != utils::eResultCode::Success)
+            {
+                utils::throwRuntimeError(
+                    code, err_, __FUNCTION__, "get_ifflags()");
+            }
+
+            ifflags_orig_ = result.second;
+
+            if (promisc)
+            {
+                if ((code = set_promisc()) != utils::eResultCode::Success)
+                {
+                    utils::throwRuntimeError(
+                        code, err_, __FUNCTION__, "set_promisc()");
+                }
+            }
+        }
+        catch (...)
+        {
+            close(fd_);
+            throw;
         }
     }
 
     RawSocket::~RawSocket()
     {
+        set_ifflags(ifflags_orig_);
         close(fd_);
     }
 
@@ -158,7 +195,7 @@ namespace core
     /// Public Methods
     /// ========================================================================
 
-    auto RawSocket::fd() const -> const int
+    auto RawSocket::fd() const -> int
     {
         return fd_;
     }
@@ -168,7 +205,7 @@ namespace core
         return ifname_;
     }
 
-    auto RawSocket::err() const -> const ssize_t
+    auto RawSocket::err() const -> ssize_t
     {
         return err_;
     }
@@ -209,25 +246,24 @@ namespace core
             return utils::eResultCode::IoctlGetConfigFailed;
         }
 
-        std::pair<utils::eResultCode, struct ifreq> result{ find_eth_ifr(ifc) };
-        utils::eResultCode code{ result.first };
-        if (code != utils::eResultCode::Success)
+        std::pair<utils::eResultCode, struct ifreq> result{ get_eth_ifr(ifc) };
+        if (result.first != utils::eResultCode::Success)
         {
-            if (code == utils::eResultCode::InterfaceNotFound)
+            if (result.first == utils::eResultCode::InterfaceNotFound)
             {
                 err_ = 0;
             }
 
-            return code;
+            return result.first;
         }
 
-        struct ifreq eth_ifr{ result.second };
-        ifname_ = eth_ifr.ifr_name;
+        ifr_ = result.second;
+        ifname_ = ifr_.ifr_name;
 
         return utils::eResultCode::Success;
     }
 
-    auto RawSocket::find_eth_ifr(const struct ifconf& ifc)
+    auto RawSocket::get_eth_ifr(const struct ifconf& ifc)
             -> std::pair<utils::eResultCode, struct ifreq>
     {
         struct ifreq* ifr{ ifc.ifc_req };
@@ -267,6 +303,53 @@ namespace core
         }
 
         return { utils::eResultCode::InterfaceNotFound, {} };
+    }
+
+    auto RawSocket::get_ifflags()
+            -> std::pair<utils::eResultCode, int16_t>
+    {
+        struct ifreq ifr_tmp{ ifr_ };
+        if (::ioctl(fd_, SIOCGIFFLAGS, &ifr_tmp) < 0)
+        {
+            err_ = errno;
+            return { utils::eResultCode::IoctlGetFlagsFailed, {} };
+        }
+
+        return { utils::eResultCode::Success, ifr_tmp.ifr_flags };
+    }
+
+    auto RawSocket::set_ifflags(const int16_t flags) -> utils::eResultCode
+    {
+        ifr_.ifr_flags = flags;
+
+        if (::ioctl(fd_, SIOCSIFFLAGS, &ifr_) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::IoctlSetFlagsFailed;
+        }
+
+        if (::setsockopt(fd_,
+                         SOL_SOCKET,
+                         SO_BINDTODEVICE,
+                         ifname_.c_str(),
+                         ifname_.length() + 1) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::SocketSetOptFailed;
+        }
+
+        return utils::eResultCode::Success;
+    }
+
+    auto RawSocket::set_promisc() -> utils::eResultCode
+    {
+        std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
+        if (result.first != utils::eResultCode::Success)
+        {
+            return result.first;
+        }
+
+        return set_ifflags(result.second | IFF_PROMISC);
     }
 }  // ::bpfocket::core
 __BPFOCKET_END
