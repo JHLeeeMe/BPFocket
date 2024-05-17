@@ -11,7 +11,7 @@ TEST(ioctl, getconf)
 {  // ::ioctl
     using namespace ::bpfocket;
 
-    core::RawSocket sock{};
+    core::RawSocket sock{ false };
     int sockfd = sock.fd();
 
     struct ifconf ifc{};
@@ -46,20 +46,42 @@ TEST(RawSocket, rule_of_X)
 {  // ::bpfocket::core
     using namespace ::bpfocket;
 
-    core::RawSocket sock{};
-    ASSERT_EQ(typeid(sock), typeid(core::RawSocket));
+    auto lambda_constructor_destructor_test = [](bool promisc) {
+        core::RawSocket sock{ promisc };
+        ASSERT_EQ(typeid(sock), typeid(core::RawSocket));
 
-    errno = 0;
-    int fd_tmp{};
-    { // destructor
-        core::RawSocket sock_tmp{};
-        fd_tmp = sock_tmp.fd();
-        ASSERT_NE(0, fd_tmp);
-        ASSERT_NE(-1, fcntl(fd_tmp, F_GETFD));
-        ASSERT_NE(EBADF, errno);
-    }
-    ASSERT_EQ(-1, fcntl(fd_tmp, F_GETFD));
-    ASSERT_EQ(EBADF, errno);
+        {
+            struct ifreq ifr{};
+            const std::string ifname = sock.ifname();
+            strncpy(ifr.ifr_name, ifname.c_str(), ifname.length() + 1);
+
+            ::ioctl(sock.fd(), SIOCGIFFLAGS, &ifr);
+
+            const uint16_t flags = ifr.ifr_flags;
+            ASSERT_EQ(0, flags & IFF_LOOPBACK);
+            ASSERT_EQ(IFF_UP, flags & IFF_UP);
+            ASSERT_EQ(IFF_RUNNING, flags & IFF_RUNNING);
+        }
+
+        errno = 0;
+        int fd_tmp{};
+        { // destructor
+            core::RawSocket sock_tmp{ promisc };
+            fd_tmp = sock_tmp.fd();
+            ASSERT_NE(0, fd_tmp);
+            ASSERT_NE(-1, fcntl(fd_tmp, F_GETFD));
+            ASSERT_NE(EBADF, errno);
+        }
+        ASSERT_EQ(-1, fcntl(fd_tmp, F_GETFD));
+        ASSERT_EQ(EBADF, errno);
+
+        {  // err()
+            ASSERT_EQ(0, sock.err());
+        }
+    };
+
+    lambda_constructor_destructor_test(false);  // promisc = flase
+    lambda_constructor_destructor_test(true);   // promisc = true
 
     {  // Compile error
         /// copy constructor
@@ -74,10 +96,6 @@ TEST(RawSocket, rule_of_X)
         // core::RawSocket sock_move_op{};
         // sock_move_op = std::move(sock);
     }
-
-    {  // err()
-        ASSERT_EQ(0, sock.err());
-    }
 }
 
 TEST(RawSocket, set_ifname)
@@ -87,7 +105,7 @@ TEST(RawSocket, set_ifname)
 
     using namespace ::bpfocket;
 
-    core::RawSocket sock{};
+    core::RawSocket sock{ false };
     ASSERT_NE(std::string(), sock.ifname());
 }
 
