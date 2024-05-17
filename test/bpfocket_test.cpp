@@ -178,13 +178,23 @@ TEST(gen_bpf_code, all)
     lambda_gen_bpf_code_test(ip_bpf_code, utils::eProtocolID::Ip);
     lambda_gen_bpf_code_test(tcp_bpf_code, utils::eProtocolID::Tcp);
     lambda_gen_bpf_code_test(udp_bpf_code, utils::eProtocolID::Udp);
+}
 
-    //core::RawSocket sock{};
-    //utils::eProtocolID proto_id{ utils::eProtocolID::Tcp };
-    //(void)sock.set_filter(proto_id);
-    //if (sock.err() != 0)
-    //{
-    //    std::cerr << sock.err() << std::endl;
-    //    return;
-    //}
+TEST(RawSocket, set_filter)
+{  // ::bpfocket::core
+    using namespace ::bpfocket;
+
+    core::RawSocket sock{};
+    sock.set_filter(utils::eProtocolID::Tcp);
+    if (sock.err() != 0)
+    {
+        std::cerr << sock.err() << std::endl;
+        return;
+    }
+
+    std::vector<struct sock_filter> filter_vec{
+        utils::gen_bpf_code(utils::eProtocolID::Tcp) };
+    
+    struct sock_fprog filter{ sock.filter() };
+    ASSERT_EQ(filter.len, filter_vec.size());
 }

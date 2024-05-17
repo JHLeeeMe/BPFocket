@@ -65,6 +65,7 @@ namespace core
         auto set_filter(utils::eProtocolID proto_id) -> void;
         auto fd()     const -> int;
         auto ifname() const -> std::string;
+        auto filter() const -> struct sock_fprog;
         auto err()    const -> ssize_t;
 
     private:
@@ -276,6 +277,11 @@ namespace core
     auto RawSocket::ifname() const -> std::string
     {
         return ifname_;
+    }
+
+    auto RawSocket::filter() const -> struct sock_fprog
+    {
+        return filter_;
     }
 
     auto RawSocket::err() const -> ssize_t
