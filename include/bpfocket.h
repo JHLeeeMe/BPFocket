@@ -2,16 +2,22 @@
 #define BPFOCKET_H
 
 
+#include <linux/filter.h>  // struct sock_filter
+#include <sys/socket.h>
 #include <sys/ioctl.h>     // ioctl()
-#include <sys/socket.h>    // socket()
 #include <net/if.h>        // struct ifconf, struct ifreq 
 #include <net/if_arp.h>    // ARPHDR_ETHER
 #include <net/ethernet.h>  // ETH_P_ALL
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <netinet/in.h>    // htons()
+#include <arpa/inet.h>     // inet_ntoa()
 #include <unistd.h>        // close()
 
 #include <stdexcept>  // runtime_error()
-#include <utility>    // std::pair<>
+#include <utility>    // std::pair
+#include <vector>     // std::vector
 
 #define __BPFOCKET_BEGIN namespace bpfocket {
 #define __BPFOCKET_END   }
@@ -25,12 +31,16 @@ __BPFOCKET_BEGIN
 namespace utils
 {
     enum class eResultCode;
+    enum class eProtocolID;
 
     [[noreturn]]
     void throwRuntimeError(eResultCode code,
                            const ssize_t err_no,
                            const std::string& caller_info,
                            const std::string& msg = "");
+
+    auto gen_bpf_code(eProtocolID proto_id)
+            -> std::vector<struct sock_filter>;
 }  // ::bpfocket::utils
 
 namespace filter
@@ -52,6 +62,7 @@ namespace core
         RawSocket(RawSocket&&) = delete;
         RawSocket& operator=(RawSocket&&) = delete;
     public:
+        auto set_filter(utils::eProtocolID proto_id) -> void;
         auto fd()     const -> int;
         auto ifname() const -> std::string;
         auto err()    const -> ssize_t;
@@ -71,6 +82,8 @@ namespace core
         struct ifreq ifr_;
         std::string  ifname_;
         int16_t      ifflags_orig_;
+
+        struct sock_fprog filter_;
 
         ssize_t err_;
     };
@@ -101,6 +114,13 @@ namespace utils
         SocketSetOptFailed   = SocketFailureBase + 2,  // 302
     };
 
+    enum class eProtocolID
+    {
+        Ip = ETH_P_IP,
+        Tcp = IPPROTO_TCP,
+        Udp = IPPROTO_UDP,
+    };
+
     [[noreturn]]
     void throwRuntimeError(eResultCode code,
                            const ssize_t err_no,
@@ -124,6 +144,38 @@ namespace utils
 
         throw std::runtime_error(oss.str());
     }
+
+    auto gen_bpf_code(eProtocolID proto_id)
+            -> std::vector<struct sock_filter>
+    {
+        std::vector<struct sock_filter> bpf_code{};
+
+        bpf_code.push_back(
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)));
+
+        if (proto_id == eProtocolID::Ip)
+        {
+            bpf_code.push_back(
+                BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 0, 1));
+        }
+        else  // Tcp or Udp
+        {
+            bpf_code.push_back(
+                BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 0, 3));
+            bpf_code.push_back(
+                BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
+                        ETH_HLEN + offsetof(struct iphdr, protocol)));
+            bpf_code.push_back(
+                BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                        static_cast<uint16_t>(proto_id), 0, 1));
+        }
+
+        bpf_code.push_back(BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF));
+        bpf_code.push_back(BPF_STMT(BPF_RET + BPF_K, 0x00));
+
+        return bpf_code;
+    }
 }  // ::bpfocket::utils
 
 namespace filter
@@ -134,7 +186,7 @@ namespace filter
 namespace core
 {
     /// ========================================================================
-    /// Rule of X
+    /// RawSocket Rule of X
     /// ========================================================================
 
     RawSocket::RawSocket(const bool promisc)
@@ -142,6 +194,7 @@ namespace core
         , ifr_{}
         , ifname_{}
         , ifflags_orig_{}
+        , filter_{}
         , err_{}
     {
         utils::eResultCode code{};
@@ -192,8 +245,28 @@ namespace core
 
 
     /// ========================================================================
-    /// Public Methods
+    /// RawSocket Public Methods
     /// ========================================================================
+
+    auto RawSocket::set_filter(utils::eProtocolID proto_id) -> void
+    {
+        err_ = 0;
+
+        std::vector<struct sock_filter> bpf_code{
+            utils::gen_bpf_code(proto_id) };
+
+        filter_.len = bpf_code.size();
+        filter_.filter = bpf_code.data();
+
+        if (::setsockopt(fd_,
+                         SOL_SOCKET,
+                         SO_ATTACH_FILTER,
+                         &filter_,
+                         sizeof(filter_)) < 0)
+        {
+            err_ = errno;
+        }
+    }
 
     auto RawSocket::fd() const -> int
     {
@@ -212,7 +285,7 @@ namespace core
 
 
     /// ========================================================================
-    /// Private Methods
+    /// RawSocket Private Methods
     /// ========================================================================
 
     auto RawSocket::create_fd() -> utils::eResultCode
