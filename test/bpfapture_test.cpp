@@ -3,15 +3,18 @@
 
 #include <fcntl.h>  // fcntl()
 
+#include <iostream>
+
 #include "gtest/gtest.h"
 
-#include "bpfocket.h"
+//#include "bpfocket.h"
+#include "bpfocket/bpfapture.h"
 
 TEST(ioctl, getconf)
 {  // ::ioctl
-    using namespace ::bpfocket;
+    using namespace bpfapture;
 
-    core::RawSocket sock{ false };
+    core::BPFapture sock{ false };
     int sockfd = sock.fd();
 
     struct ifconf ifc{};
@@ -42,13 +45,14 @@ TEST(ioctl, getconf)
     }
 }
 
-TEST(RawSocket, rule_of_X)
-{  // ::bpfocket::core
-    using namespace ::bpfocket;
+TEST(BPFapture, rule_of_X)
+{  // ::bpfocket::bpfapture::core
+    using namespace bpfapture;
+    namespace bpfapture = ::bpfocket::bpfapture;
 
     auto lambda_constructor_destructor_test = [](bool promisc) {
-        core::RawSocket sock{ promisc };
-        ASSERT_EQ(typeid(sock), typeid(core::RawSocket));
+        core::BPFapture sock{ promisc };
+        ASSERT_EQ(typeid(sock), typeid(core::BPFapture));
 
         {
             struct ifreq ifr{};
@@ -66,7 +70,7 @@ TEST(RawSocket, rule_of_X)
         errno = 0;
         int fd_tmp{};
         { // destructor
-            core::RawSocket sock_tmp{ promisc };
+            core::BPFapture sock_tmp{ promisc };
             fd_tmp = sock_tmp.fd();
             ASSERT_NE(0, fd_tmp);
             ASSERT_NE(-1, fcntl(fd_tmp, F_GETFD));
@@ -85,14 +89,14 @@ TEST(RawSocket, rule_of_X)
 
     {  // Move
         {  // constructor
-            core::RawSocket sock{};
+            core::BPFapture sock{};
             ASSERT_NE(-1, fcntl(sock.fd(), F_GETFD));
 
             int sockfd = sock.fd();
             std::string ifname{ sock.ifname() };
 
             // move constructor
-            core::RawSocket sock_move{ std::move(sock) };
+            core::BPFapture sock_move{ std::move(sock) };
             ASSERT_NE(-1, fcntl(sock_move.fd(), F_GETFD));
 
             // compare new & orig
@@ -105,14 +109,14 @@ TEST(RawSocket, rule_of_X)
         }
 
         {  // operator=
-            core::RawSocket sock{};
+            core::BPFapture sock{};
             ASSERT_NE(-1, fcntl(sock.fd(), F_GETFD));
 
             int sockfd = sock.fd();
             std::string ifname{ sock.ifname() };
 
             // move assignment operator
-            core::RawSocket sock_move_op{};
+            core::BPFapture sock_move_op{};
             sock_move_op = std::move(sock);
             ASSERT_NE(-1, fcntl(sock_move_op.fd(), F_GETFD));
 
@@ -127,31 +131,31 @@ TEST(RawSocket, rule_of_X)
     }
 
     {  // Copy (Compile error)
-        //core::RawSocket sock{};
+        //core::BPFapture sock{};
 
         /// copy constructor
-        // core::RawSocket sock_copy{ sock };
+        // core::BPFapture sock_copy{ sock };
 
         /// copy assignment operator
-        // core::RawSocket sock_copy_op{};
+        // core::BPFapture sock_copy_op{};
         // sock_copy_op = sock;
     }
 }
 
-TEST(RawSocket, set_ifname)
-{  // ::bpfocket::core
+TEST(BPFapture, set_ifname)
+{  // ::bpfocket::bpfapture::core
     /// set_ifname() is exec in constructor
     ///
 
-    using namespace ::bpfocket;
+    using namespace bpfapture;
 
-    core::RawSocket sock{ false };
+    core::BPFapture sock{ false };
     ASSERT_NE(std::string(), sock.ifname());
 }
 
 TEST(throwRuntimeError, all)
-{  // ::bpfocket::utils
-    using namespace ::bpfocket;
+{  // ::bpfocket::bpfapture::utils
+    using namespace bpfapture;
 
     ssize_t err_no = 1;
 
@@ -163,8 +167,8 @@ TEST(throwRuntimeError, all)
 }
 
 TEST(gen_bpf_code, all)
-{  // ::bpfocket::filter
-    using namespace ::bpfocket;
+{  // ::bpfocket::bpfapture::filter
+    using namespace bpfapture;
 
     struct sock_filter ip_bpf_code[] = {
         BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
@@ -220,11 +224,11 @@ TEST(gen_bpf_code, all)
     lambda_gen_bpf_code_test(udp_bpf_code, filter::eProtocolID::Udp);
 }
 
-TEST(RawSocket, set_filter)
-{  // ::bpfocket::core
-    using namespace ::bpfocket;
+TEST(BPFapture, set_filter)
+{  // ::bpfocket::bpfapture::core
+    using namespace bpfapture;
 
-    core::RawSocket sock{};
+    core::BPFapture sock{};
     sock.set_filter(filter::eProtocolID::Tcp);
     if (sock.err() != 0)
     {
