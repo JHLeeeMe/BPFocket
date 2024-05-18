@@ -163,7 +163,7 @@ TEST(throwRuntimeError, all)
 }
 
 TEST(gen_bpf_code, all)
-{  // ::bpfocket::utils
+{  // ::bpfocket::filter
     using namespace ::bpfocket;
 
     struct sock_filter ip_bpf_code[] = {
@@ -181,7 +181,7 @@ TEST(gen_bpf_code, all)
         BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
                  ETH_HLEN + offsetof(struct iphdr, protocol)),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-                 static_cast<uint16_t>(utils::eProtocolID::Tcp), 0, 1),
+                 static_cast<uint16_t>(filter::eProtocolID::Tcp), 0, 1),
         BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
         BPF_STMT(BPF_RET + BPF_K, 0x00),
     };
@@ -193,15 +193,15 @@ TEST(gen_bpf_code, all)
         BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
                  ETH_HLEN + offsetof(struct iphdr, protocol)),
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-                 static_cast<uint16_t>(utils::eProtocolID::Udp), 0, 1),
+                 static_cast<uint16_t>(filter::eProtocolID::Udp), 0, 1),
         BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
         BPF_STMT(BPF_RET + BPF_K, 0x00),
     };
 
     auto lambda_gen_bpf_code_test =
-        [](struct sock_filter* code, utils::eProtocolID proto_id) {
+        [](struct sock_filter* code, filter::eProtocolID proto_id) {
             std::vector<struct sock_filter> bpf_code{
-                utils::gen_bpf_code(proto_id) };
+                filter::gen_bpf_code(proto_id) };
 
             int idx = 0;
             for (const auto& e : bpf_code)
@@ -215,9 +215,9 @@ TEST(gen_bpf_code, all)
             }
         };
 
-    lambda_gen_bpf_code_test(ip_bpf_code, utils::eProtocolID::Ip);
-    lambda_gen_bpf_code_test(tcp_bpf_code, utils::eProtocolID::Tcp);
-    lambda_gen_bpf_code_test(udp_bpf_code, utils::eProtocolID::Udp);
+    lambda_gen_bpf_code_test(ip_bpf_code, filter::eProtocolID::Ip);
+    lambda_gen_bpf_code_test(tcp_bpf_code, filter::eProtocolID::Tcp);
+    lambda_gen_bpf_code_test(udp_bpf_code, filter::eProtocolID::Udp);
 }
 
 TEST(RawSocket, set_filter)
@@ -225,7 +225,7 @@ TEST(RawSocket, set_filter)
     using namespace ::bpfocket;
 
     core::RawSocket sock{};
-    sock.set_filter(utils::eProtocolID::Tcp);
+    sock.set_filter(filter::eProtocolID::Tcp);
     if (sock.err() != 0)
     {
         std::cerr << sock.err() << std::endl;
@@ -233,7 +233,7 @@ TEST(RawSocket, set_filter)
     }
 
     std::vector<struct sock_filter> filter_vec{
-        utils::gen_bpf_code(utils::eProtocolID::Tcp) };
+        filter::gen_bpf_code(filter::eProtocolID::Tcp) };
     
     struct sock_fprog filter{ sock.filter() };
     ASSERT_EQ(filter.len, filter_vec.size());
