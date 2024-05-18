@@ -59,8 +59,8 @@ namespace core
         RawSocket(const RawSocket&) = delete;
         RawSocket& operator=(const RawSocket&) = delete;
 
-        RawSocket(RawSocket&&) = delete;
-        RawSocket& operator=(RawSocket&&) = delete;
+        RawSocket(RawSocket&& other);
+        RawSocket& operator=(RawSocket&& other);
     public:
         auto set_filter(utils::eProtocolID proto_id) -> void;
         auto fd()     const -> int;
@@ -240,8 +240,43 @@ namespace core
 
     RawSocket::~RawSocket()
     {
+        if (fd_ == -1)
+        {
+            return;
+        }
+
         set_ifflags(ifflags_orig_);
         close(fd_);
+    }
+
+    RawSocket::RawSocket(RawSocket&& other)
+        : fd_{ other.fd_ }
+        , ifr_{ other.ifr_ }
+        , ifname_{ std::move(other.ifname_) }
+        , ifflags_orig_{ other.ifflags_orig_ }
+        , filter_{ other.filter_ }
+        , err_{ other.err_ }
+    {
+        other.fd_ = -1;
+        other.err_ = 0;
+    }
+
+    RawSocket& RawSocket::operator=(RawSocket&& other)
+    {
+        if (this != &other)
+        {
+            fd_ = other.fd_;
+            ifr_ = other.ifr_;
+            ifname_ = std::move(other.ifname_);
+            ifflags_orig_ = other.ifflags_orig_;
+            filter_ = other.filter_;
+            err_ = other.err_;
+
+            other.fd_ = -1;
+            other.err_ = 0;
+        }
+
+        return *this;
     }
 
 

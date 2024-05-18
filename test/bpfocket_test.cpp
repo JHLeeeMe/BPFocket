@@ -83,18 +83,58 @@ TEST(RawSocket, rule_of_X)
     lambda_constructor_destructor_test(false);  // promisc = flase
     lambda_constructor_destructor_test(true);   // promisc = true
 
-    {  // Compile error
+    {  // Move
+        {  // constructor
+            core::RawSocket sock{};
+            ASSERT_NE(-1, fcntl(sock.fd(), F_GETFD));
+
+            int sockfd = sock.fd();
+            std::string ifname{ sock.ifname() };
+
+            // move constructor
+            core::RawSocket sock_move{ std::move(sock) };
+            ASSERT_NE(-1, fcntl(sock_move.fd(), F_GETFD));
+
+            // compare new & orig
+            ASSERT_EQ(sockfd, sock_move.fd());
+            ASSERT_EQ(ifname, sock_move.ifname());
+            ASSERT_EQ(-1, fcntl(sock.fd(), F_GETFD));
+            ASSERT_EQ(EBADF, errno);
+
+            ASSERT_NE(ifname, sock.ifname());
+        }
+
+        {  // operator=
+            core::RawSocket sock{};
+            ASSERT_NE(-1, fcntl(sock.fd(), F_GETFD));
+
+            int sockfd = sock.fd();
+            std::string ifname{ sock.ifname() };
+
+            // move assignment operator
+            core::RawSocket sock_move_op{};
+            sock_move_op = std::move(sock);
+            ASSERT_NE(-1, fcntl(sock_move_op.fd(), F_GETFD));
+
+            // compare new & orig
+            ASSERT_EQ(sockfd, sock_move_op.fd());
+            ASSERT_EQ(ifname, sock_move_op.ifname());
+            ASSERT_EQ(-1, fcntl(sock.fd(), F_GETFD));
+            ASSERT_EQ(EBADF, errno);
+
+            ASSERT_NE(ifname, sock.ifname());
+        }
+    }
+
+    {  // Copy (Compile error)
+        //core::RawSocket sock{};
+
         /// copy constructor
-        // core::RawSocket sock_copy{ sockfd };
+        // core::RawSocket sock_copy{ sock };
+
         /// copy assignment operator
         // core::RawSocket sock_copy_op{};
         // sock_copy_op = sock;
-
-        /// move constructor
-        // core::RawSocket sock_move{ std::move(sock) };
-        /// move assignment operator
-        // core::RawSocket sock_move_op{};
-        // sock_move_op = std::move(sock);
     }
 }
 
