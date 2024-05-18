@@ -31,21 +31,20 @@ __BPFOCKET_BEGIN
 namespace utils
 {
     enum class eResultCode;
-    enum class eProtocolID;
 
     [[noreturn]]
     void throwRuntimeError(eResultCode code,
                            const ssize_t err_no,
                            const std::string& caller_info,
                            const std::string& msg = "");
-
-    auto gen_bpf_code(eProtocolID proto_id)
-            -> std::vector<struct sock_filter>;
 }  // ::bpfocket::utils
 
 namespace filter
 {
+    enum class eProtocolID;
 
+    auto gen_bpf_code(eProtocolID proto_id)
+            -> std::vector<struct sock_filter>;
 }  // ::bpfocket::filter
 
 namespace core
@@ -62,7 +61,7 @@ namespace core
         RawSocket(RawSocket&& other);
         RawSocket& operator=(RawSocket&& other);
     public:
-        auto set_filter(utils::eProtocolID proto_id) -> void;
+        auto set_filter(filter::eProtocolID proto_id) -> void;
         auto fd()     const -> int;
         auto ifname() const -> std::string;
         auto filter() const -> struct sock_fprog;
@@ -115,13 +114,6 @@ namespace utils
         SocketSetOptFailed   = SocketFailureBase + 2,  // 302
     };
 
-    enum class eProtocolID
-    {
-        Ip = ETH_P_IP,
-        Tcp = IPPROTO_TCP,
-        Udp = IPPROTO_UDP,
-    };
-
     [[noreturn]]
     void throwRuntimeError(eResultCode code,
                            const ssize_t err_no,
@@ -145,6 +137,16 @@ namespace utils
 
         throw std::runtime_error(oss.str());
     }
+}  // ::bpfocket::utils
+
+namespace filter
+{
+    enum class eProtocolID
+    {
+        Ip = ETH_P_IP,
+        Tcp = IPPROTO_TCP,
+        Udp = IPPROTO_UDP,
+    };
 
     auto gen_bpf_code(eProtocolID proto_id)
             -> std::vector<struct sock_filter>
@@ -177,11 +179,6 @@ namespace utils
 
         return bpf_code;
     }
-}  // ::bpfocket::utils
-
-namespace filter
-{
-
 }  // ::bpfocket::filter
 
 namespace core
@@ -284,12 +281,12 @@ namespace core
     /// RawSocket Public Methods
     /// ========================================================================
 
-    auto RawSocket::set_filter(utils::eProtocolID proto_id) -> void
+    auto RawSocket::set_filter(filter::eProtocolID proto_id) -> void
     {
         err_ = 0;
 
         std::vector<struct sock_filter> bpf_code{
-            utils::gen_bpf_code(proto_id) };
+            filter::gen_bpf_code(proto_id) };
 
         filter_.len = bpf_code.size();
         filter_.filter = bpf_code.data();
