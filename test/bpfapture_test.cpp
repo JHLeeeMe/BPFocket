@@ -11,7 +11,7 @@
 #include "bpfocket/bpfapture.h"
 
 TEST(ioctl, getconf)
-{  // ::ioctl
+{  // ::ioctl()
     using namespace bpfapture;
 
     core::BPFapture sock{ false };
@@ -241,4 +241,26 @@ TEST(BPFapture, set_filter)
     
     struct sock_fprog filter{ sock.filter() };
     ASSERT_EQ(filter.len, filter_vec.size());
+}
+
+
+TEST(BPFapture, set_mtu)
+{  // ::bpfocket::bpfapture::core
+    /// set_mtu() is exec in constructor
+    ///
+
+    using namespace bpfapture;
+
+    core::BPFapture sock{};
+    int sockfd = sock.fd();
+
+    struct ifreq ifr{};
+    strncpy(ifr.ifr_name, sock.ifname().c_str(), sock.ifname().length());
+    if (::ioctl(sockfd, SIOCGIFMTU, &ifr) < 0)
+    {
+        perror("ioctl");
+        return;
+    }
+
+    ASSERT_EQ(ifr.ifr_mtu, sock.mtu());
 }

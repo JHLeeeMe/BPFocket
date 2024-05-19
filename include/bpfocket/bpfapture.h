@@ -65,15 +65,17 @@ namespace core
         BPFapture& operator=(BPFapture&& other);
     public:
         auto set_filter(filter::eProtocolID proto_id) -> void;
-        auto fd()     const -> int;
-        auto ifname() const -> std::string;
-        auto filter() const -> struct sock_fprog;
-        auto err()    const -> ssize_t;
+        auto mtu() const -> int;
+        auto fd()      const -> int;
+        auto ifname()  const -> std::string;
+        auto filter()  const -> struct sock_fprog;
+        auto err()     const -> ssize_t;
 
     private:
         auto create_fd()   -> utils::eResultCode;
         auto set_ifname()  -> utils::eResultCode;
         auto set_promisc() -> utils::eResultCode;
+        auto set_mtu()     -> utils::eResultCode;
         auto set_ifflags(const int16_t flag) -> utils::eResultCode;
         auto get_ifflags()
                 -> std::pair<utils::eResultCode, int16_t>;
@@ -111,6 +113,7 @@ namespace utils
         IoctlGetFlagsFailed  = IoctlFailureBase + 2,  // 202
         IoctlSetFlagsFailed  = IoctlFailureBase + 3,  // 203
         IoctlGetHwAddrFailed = IoctlFailureBase + 4,  // 204
+        IoctlSetMtuFailed    = IoctlFailureBase + 5,  // 205
 
         SocketFailureBase    = 300,
         SocketCreationFailed = SocketFailureBase + 1,  // 301
@@ -211,6 +214,11 @@ namespace core
             {
                 utils::throwRuntimeError(
                     code, err_, __FUNCTION__, "set_ifname()");
+            }
+
+            if ((code = set_mtu()) != utils::eResultCode::Success)
+            {
+                utils::throwRuntimeError(code, err_, __FUNCTION__, "set_mtu()");
             }
 
             std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
@@ -464,6 +472,22 @@ namespace core
         }
 
         return set_ifflags(result.second | IFF_PROMISC);
+    }
+
+    auto BPFapture::set_mtu() -> utils::eResultCode
+    {
+        if (::ioctl(fd_, SIOCGIFMTU, &ifr_) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::IoctlSetMtuFailed;
+        }
+
+        return utils::eResultCode::Success;
+    }
+
+    auto BPFapture::mtu() const -> int 
+    {
+        return ifr_.ifr_mtu;
     }
 }  // ::bpfocket::bpfapture::core
 
