@@ -263,3 +263,51 @@ TEST(BPFapture, set_mtu)
 
     ASSERT_EQ(ifr.ifr_mtu, sock.mtu());
 }
+
+TEST(BPFapture, receive)
+{  // ::bpfocket::bpfapture::core
+    using namespace bpfapture;
+
+    core::BPFapture sock{ true };
+    sock.set_filter(filter::eProtocolID::Ip);
+    //sock.set_filter(filter::eProtocolID::Tcp);
+    //sock.set_filter(filter::eProtocolID::Udp);
+    if (sock.err() != 0)
+    {
+        std::cerr << sock.err() << std::endl;
+        return;
+    }
+
+    std::vector<uint8_t> buf(sock.mtu());
+    ssize_t received_bytes = 0;
+
+    int max_cnt = 10;
+    while (true && max_cnt--)
+    {
+        if ((received_bytes = sock.receive(buf.data(), buf.size())) < 0)
+        {
+            std::cerr << sock.err() << std::endl;
+            return;
+        }
+
+        for (size_t i = 0; i < received_bytes; i++)
+        {
+            if (i != 0 && i % 16 == 0)
+            {
+                std::cout << std::endl;
+            }
+
+            uint8_t c = buf[i];
+            if (c > 32 && c < 126 )
+            {
+                printf("%c", c);
+            }
+            else
+            {
+                printf(".");
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}

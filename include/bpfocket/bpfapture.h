@@ -65,6 +65,7 @@ namespace core
         BPFapture& operator=(BPFapture&& other);
     public:
         auto set_filter(filter::eProtocolID proto_id) -> void;
+        auto receive(void* buf, size_t buf_len) -> ssize_t;
         auto mtu()     const -> int;
         auto fd()      const -> int;
         auto ifname()  const -> std::string;
@@ -118,6 +119,7 @@ namespace utils
         SocketFailureBase    = 300,
         SocketCreationFailed = SocketFailureBase + 1,  // 301
         SocketSetOptFailed   = SocketFailureBase + 2,  // 302
+        SocketReceiveFailed  = SocketFailureBase + 3,  // 303
     };
 
     [[noreturn]]
@@ -310,6 +312,18 @@ namespace core
         {
             err_ = errno;
         }
+    }
+
+    auto BPFapture::receive(void* buf, size_t buf_len) -> ssize_t
+    {
+        ssize_t received_bytes =
+            ::recvfrom(fd_, buf, buf_len, 0, nullptr, nullptr);
+        if (received_bytes < 0)
+        {
+            err_ = errno;
+        }
+
+        return received_bytes;
     }
 
     auto BPFapture::fd() const -> int
