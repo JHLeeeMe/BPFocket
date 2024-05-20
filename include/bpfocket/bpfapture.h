@@ -65,7 +65,7 @@ namespace core
         BPFapture& operator=(BPFapture&& other);
     public:
         auto set_filter(filter::eProtocolID proto_id) -> void;
-        auto mtu() const -> int;
+        auto mtu()     const -> int;
         auto fd()      const -> int;
         auto ifname()  const -> std::string;
         auto filter()  const -> struct sock_fprog;
