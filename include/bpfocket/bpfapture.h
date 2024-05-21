@@ -65,7 +65,7 @@ namespace core
         BPFapture& operator=(BPFapture&& other);
     public:
         auto set_filter(filter::eProtocolID proto_id) -> void;
-        auto receive(void* buf, size_t buf_len) -> ssize_t;
+        auto receive(void* buf, const size_t buf_len) -> ssize_t;
         auto mtu()     const -> int;
         auto fd()      const -> int;
         auto ifname()  const -> std::string;
@@ -314,7 +314,7 @@ namespace core
         }
     }
 
-    auto BPFapture::receive(void* buf, size_t buf_len) -> ssize_t
+    auto BPFapture::receive(void* buf, const size_t buf_len) -> ssize_t
     {
         ssize_t received_bytes =
             ::recvfrom(fd_, buf, buf_len, 0, nullptr, nullptr);
