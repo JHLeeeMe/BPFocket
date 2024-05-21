@@ -1,3 +1,36 @@
+/// ============================================================================
+/// bpfapture.h
+/// ----------------------------------------------------------------------------
+/// linux packet capture header-only library using berkely packet filter
+///
+/// ----------------------------------------------------------------------------
+/// Code Structure
+/// ----------------------------------------------------------------------------
+/// namespace bpfocket
+/// {
+/// namespace bpfapture
+/// {
+///     // Declarations
+///     namespace utils { ... }
+///     namespace filter { ... }
+///     namespace core { ... }
+///
+///     // Implementation
+///     namespace utils { ... }
+///     namespace filter { ... }
+///     namespace core
+///     {
+///         inline BPFapture::xxx { ... };
+///         ...
+///     }
+/// }
+/// }
+/// using bpfapture = ::bpfocket::bpfapture;
+///
+/// ----------------------------------------------------------------------------
+/// License: The Unlicense <https://unlicense.org/>
+/// ============================================================================
+
 #ifndef BPFAPTURE_H
 #define BPFAPTURE_H
 
@@ -97,7 +130,7 @@ namespace core
 
 
 /// ============================================================================
-/// Definitions
+/// Implementation
 /// ============================================================================
 
 namespace utils
@@ -123,10 +156,10 @@ namespace utils
     };
 
     [[noreturn]]
-    void throwRuntimeError(eResultCode code,
-                           const ssize_t err_no,
-                           const std::string& caller_info,
-                           const std::string& msg)
+    inline void throwRuntimeError(eResultCode code,
+                                  const ssize_t err_no,
+                                  const std::string& caller_info,
+                                  const std::string& msg)
     {
         std::ostringstream oss{};
         oss << "Error occurred in " << caller_info << ":\n\t";
@@ -156,7 +189,7 @@ namespace filter
         Udp = IPPROTO_UDP,
     };
 
-    auto gen_bpf_code(eProtocolID proto_id)
+    inline auto gen_bpf_code(eProtocolID proto_id)
             -> std::vector<struct sock_filter>
     {
         std::vector<struct sock_filter> bpf_code{};
@@ -195,7 +228,7 @@ namespace core
     /// BPFapture Rule of X
     /// ========================================================================
 
-    BPFapture::BPFapture(const bool promisc)
+    inline BPFapture::BPFapture(const bool promisc)
         : fd_{ -1 }
         , ifr_{}
         , ifname_{}
@@ -248,7 +281,7 @@ namespace core
         }
     }
 
-    BPFapture::~BPFapture()
+    inline BPFapture::~BPFapture()
     {
         if (fd_ == -1)
         {
@@ -259,7 +292,7 @@ namespace core
         close(fd_);
     }
 
-    BPFapture::BPFapture(BPFapture&& other)
+    inline BPFapture::BPFapture(BPFapture&& other)
         : fd_{ other.fd_ }
         , ifr_{ other.ifr_ }
         , ifname_{ std::move(other.ifname_) }
@@ -271,7 +304,7 @@ namespace core
         other.err_ = 0;
     }
 
-    BPFapture& BPFapture::operator=(BPFapture&& other)
+    inline BPFapture& BPFapture::operator=(BPFapture&& other)
     {
         if (this != &other)
         {
@@ -294,7 +327,7 @@ namespace core
     /// BPFapture Public Methods
     /// ========================================================================
 
-    auto BPFapture::set_filter(filter::eProtocolID proto_id) -> void
+    inline auto BPFapture::set_filter(filter::eProtocolID proto_id) -> void
     {
         err_ = 0;
 
@@ -314,7 +347,7 @@ namespace core
         }
     }
 
-    auto BPFapture::receive(void* buf, const size_t buf_len) -> ssize_t
+    inline auto BPFapture::receive(void* buf, const size_t buf_len) -> ssize_t
     {
         ssize_t received_bytes =
             ::recvfrom(fd_, buf, buf_len, 0, nullptr, nullptr);
@@ -326,22 +359,22 @@ namespace core
         return received_bytes;
     }
 
-    auto BPFapture::fd() const -> int
+    inline auto BPFapture::fd() const -> int
     {
         return fd_;
     }
 
-    auto BPFapture::ifname() const -> std::string
+    inline auto BPFapture::ifname() const -> std::string
     {
         return ifname_;
     }
 
-    auto BPFapture::filter() const -> struct sock_fprog
+    inline auto BPFapture::filter() const -> struct sock_fprog
     {
         return filter_;
     }
 
-    auto BPFapture::err() const -> ssize_t
+    inline auto BPFapture::err() const -> ssize_t
     {
         return err_;
     }
@@ -351,7 +384,7 @@ namespace core
     /// BPFapture Private Methods
     /// ========================================================================
 
-    auto BPFapture::create_fd() -> utils::eResultCode
+    inline auto BPFapture::create_fd() -> utils::eResultCode
     {
         fd_ = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
         if (fd_ < 0)
@@ -363,7 +396,7 @@ namespace core
         return utils::eResultCode::Success;
     }
 
-    auto BPFapture::set_ifname() -> utils::eResultCode
+    inline auto BPFapture::set_ifname() -> utils::eResultCode
     {
         struct ifconf ifc{};
 
@@ -399,7 +432,7 @@ namespace core
         return utils::eResultCode::Success;
     }
 
-    auto BPFapture::get_eth_ifr(const struct ifconf& ifc)
+    inline auto BPFapture::get_eth_ifr(const struct ifconf& ifc)
             -> std::pair<utils::eResultCode, struct ifreq>
     {
         struct ifreq* ifr{ ifc.ifc_req };
@@ -441,7 +474,7 @@ namespace core
         return { utils::eResultCode::InterfaceNotFound, {} };
     }
 
-    auto BPFapture::get_ifflags()
+    inline auto BPFapture::get_ifflags()
             -> std::pair<utils::eResultCode, int16_t>
     {
         struct ifreq ifr_tmp{ ifr_ };
@@ -454,7 +487,7 @@ namespace core
         return { utils::eResultCode::Success, ifr_tmp.ifr_flags };
     }
 
-    auto BPFapture::set_ifflags(const int16_t flags) -> utils::eResultCode
+    inline auto BPFapture::set_ifflags(const int16_t flags) -> utils::eResultCode
     {
         ifr_.ifr_flags = flags;
 
@@ -477,7 +510,7 @@ namespace core
         return utils::eResultCode::Success;
     }
 
-    auto BPFapture::set_promisc() -> utils::eResultCode
+    inline auto BPFapture::set_promisc() -> utils::eResultCode
     {
         std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
         if (result.first != utils::eResultCode::Success)
@@ -488,7 +521,7 @@ namespace core
         return set_ifflags(result.second | IFF_PROMISC);
     }
 
-    auto BPFapture::set_mtu() -> utils::eResultCode
+    inline auto BPFapture::set_mtu() -> utils::eResultCode
     {
         if (::ioctl(fd_, SIOCGIFMTU, &ifr_) < 0)
         {
@@ -499,7 +532,7 @@ namespace core
         return utils::eResultCode::Success;
     }
 
-    auto BPFapture::mtu() const -> int 
+    inline auto BPFapture::mtu() const -> int 
     {
         return ifr_.ifr_mtu;
     }
