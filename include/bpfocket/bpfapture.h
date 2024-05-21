@@ -119,7 +119,6 @@ namespace core
         int fd_;
 
         struct ifreq ifr_;
-        std::string  ifname_;
         int16_t      ifflags_orig_;
 
         struct sock_fprog filter_;
@@ -231,7 +230,6 @@ namespace core
     inline BPFapture::BPFapture(const bool promisc)
         : fd_{ -1 }
         , ifr_{}
-        , ifname_{}
         , ifflags_orig_{}
         , filter_{}
         , err_{}
@@ -295,7 +293,6 @@ namespace core
     inline BPFapture::BPFapture(BPFapture&& other)
         : fd_{ other.fd_ }
         , ifr_{ other.ifr_ }
-        , ifname_{ std::move(other.ifname_) }
         , ifflags_orig_{ other.ifflags_orig_ }
         , filter_{ other.filter_ }
         , err_{ other.err_ }
@@ -310,7 +307,6 @@ namespace core
         {
             fd_ = other.fd_;
             ifr_ = other.ifr_;
-            ifname_ = std::move(other.ifname_);
             ifflags_orig_ = other.ifflags_orig_;
             filter_ = other.filter_;
             err_ = other.err_;
@@ -366,7 +362,7 @@ namespace core
 
     inline auto BPFapture::ifname() const -> std::string
     {
-        return ifname_;
+        return ifr_.ifr_name;
     }
 
     inline auto BPFapture::filter() const -> struct sock_fprog
@@ -427,7 +423,6 @@ namespace core
         }
 
         ifr_ = result.second;
-        ifname_ = ifr_.ifr_name;
 
         return utils::eResultCode::Success;
     }
@@ -500,8 +495,8 @@ namespace core
         if (::setsockopt(fd_,
                          SOL_SOCKET,
                          SO_BINDTODEVICE,
-                         ifname_.c_str(),
-                         ifname_.length() + 1) < 0)
+                         ifr_.ifr_name,
+                         strnlen(ifr_.ifr_name, IFNAMSIZ) + 1) < 0)
         {
             err_ = errno;
             return utils::eResultCode::SocketSetOptFailed;

@@ -171,12 +171,11 @@ TEST(BPFapture, rule_of_X)
             ASSERT_NE(-1, fcntl(sock_move.fd(), F_GETFD));
 
             // compare new & orig
+            ASSERT_EQ(-1, sock.fd());
             ASSERT_EQ(sockfd, sock_move.fd());
             ASSERT_EQ(ifname, sock_move.ifname());
             ASSERT_EQ(-1, fcntl(sock.fd(), F_GETFD));
             ASSERT_EQ(EBADF, errno);
-
-            ASSERT_NE(ifname, sock.ifname());
         }
 
         {  // operator=
@@ -192,12 +191,11 @@ TEST(BPFapture, rule_of_X)
             ASSERT_NE(-1, fcntl(sock_move_op.fd(), F_GETFD));
 
             // compare new & orig
+            ASSERT_EQ(-1, sock.fd());
             ASSERT_EQ(sockfd, sock_move_op.fd());
             ASSERT_EQ(ifname, sock_move_op.ifname());
             ASSERT_EQ(-1, fcntl(sock.fd(), F_GETFD));
             ASSERT_EQ(EBADF, errno);
-
-            ASSERT_NE(ifname, sock.ifname());
         }
     }
 
