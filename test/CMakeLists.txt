@@ -37,7 +37,7 @@ target_include_directories(BPFocket_Test
 
 # -l
 target_link_libraries(BPFocket_Test
-    PUBLIC 
+    PUBLIC
         gtest
         gtest_main
 )

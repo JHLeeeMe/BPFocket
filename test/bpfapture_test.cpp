@@ -236,7 +236,7 @@ TEST(BPFapture, set_filter)
 
     std::vector<struct sock_filter> filter_vec{
         filter::gen_bpf_code(filter::eProtocolID::Tcp) };
-    
+
     struct sock_fprog filter{ sock.filter() };
     ASSERT_EQ(filter.len, filter_vec.size());
 }
