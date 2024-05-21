@@ -38,7 +38,7 @@
 #include <linux/filter.h>  // struct sock_filter
 #include <sys/socket.h>
 #include <sys/ioctl.h>     // ioctl()
-#include <net/if.h>        // struct ifconf, struct ifreq 
+#include <net/if.h>        // struct ifconf, struct ifreq
 #include <net/if_arp.h>    // ARPHDR_ETHER
 #include <net/ethernet.h>  // ETH_P_ALL
 #include <netinet/ip.h>
@@ -48,6 +48,7 @@
 #include <arpa/inet.h>     // inet_ntoa()
 #include <unistd.h>        // close()
 
+#include <cstring>    // strnlen()
 #include <stdexcept>  // std::runtime_error()
 #include <sstream>    // std::ostringstream()
 #include <utility>    // std::pair
@@ -527,7 +528,7 @@ namespace core
         return utils::eResultCode::Success;
     }
 
-    inline auto BPFapture::mtu() const -> int 
+    inline auto BPFapture::mtu() const -> int
     {
         return ifr_.ifr_mtu;
     }
