@@ -1,4 +1,4 @@
-/// bpfocket_test.cpp
+/// bpfapture_test.cpp
 ///
 
 #include <fcntl.h>  // fcntl()
@@ -62,58 +62,137 @@ TEST(gen_bpf_code, all)
 {  // ::bpfocket::bpfapture::filter
     using namespace bpfapture;
 
-    struct sock_filter ip_bpf_code[] = {
-        BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
-                 offsetof(struct ether_header, ether_type)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 0, 1),
-        BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
-        BPF_STMT(BPF_RET + BPF_K, 0x00),
-    };
-
-    struct sock_filter tcp_bpf_code[] = {
-        BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
-                 offsetof(struct ether_header, ether_type)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 0, 3),
-        BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
-                 ETH_HLEN + offsetof(struct iphdr, protocol)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-                 static_cast<uint16_t>(filter::eProtocolID::Tcp), 0, 1),
-        BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
-        BPF_STMT(BPF_RET + BPF_K, 0x00),
-    };
-
-    struct sock_filter udp_bpf_code[] = {
-        BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
-                 offsetof(struct ether_header, ether_type)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 0, 3),
-        BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
-                 ETH_HLEN + offsetof(struct iphdr, protocol)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-                 static_cast<uint16_t>(filter::eProtocolID::Udp), 0, 1),
-        BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
-        BPF_STMT(BPF_RET + BPF_K, 0x00),
-    };
-
     auto lambda_gen_bpf_code_test =
-        [](struct sock_filter* code, filter::eProtocolID proto_id) {
-            std::vector<struct sock_filter> bpf_code{
-                filter::gen_bpf_code(proto_id) };
+        [](struct sock_filter* expected_arr,
+           std::vector<filter::eProtocolID> proto_ids) -> void
+        {
+            std::vector<struct sock_filter> generated_vec{
+                filter::gen_bpf_code(proto_ids) };
 
-            int idx = 0;
-            for (const auto& e : bpf_code)
+            for (size_t i = 0; i < generated_vec.size(); i++)
             {
-                ASSERT_EQ(code[idx].code, e.code);
-                ASSERT_EQ(code[idx].jt, e.jt);
-                ASSERT_EQ(code[idx].jf, e.jf);
-                ASSERT_EQ(code[idx].k, e.k);
-
-                idx++;
+                ASSERT_EQ(expected_arr[i].code, generated_vec[i].code);
+                ASSERT_EQ(expected_arr[i].jt, generated_vec[i].jt);
+                ASSERT_EQ(expected_arr[i].jf, generated_vec[i].jf);
+                ASSERT_EQ(expected_arr[i].k, generated_vec[i].k);
             }
         };
 
-    lambda_gen_bpf_code_test(ip_bpf_code, filter::eProtocolID::Ip);
-    lambda_gen_bpf_code_test(tcp_bpf_code, filter::eProtocolID::Tcp);
-    lambda_gen_bpf_code_test(udp_bpf_code, filter::eProtocolID::Udp);
+    {  // ip
+        std::vector<filter::eProtocolID> ip_ids_1{ filter::eProtocolID::Ip };
+        std::set<filter::eProtocolID> set_ip_ids_1{ ip_ids_1.begin(),
+                                                    ip_ids_1.end() };
+        struct sock_filter ip_bpf_code_1[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        std::vector<filter::eProtocolID> ip_ids_3{ filter::eProtocolID::Ip,
+                                                   filter::eProtocolID::Ip,
+                                                   filter::eProtocolID::Ip };
+        std::set<filter::eProtocolID> set_ip_ids_3{ ip_ids_3.begin(),
+                                                    ip_ids_3.end() };
+        struct sock_filter ip_bpf_code_3[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        lambda_gen_bpf_code_test(ip_bpf_code_1, ip_ids_1);
+        lambda_gen_bpf_code_test(ip_bpf_code_3, ip_ids_3);
+    }
+
+    {  // tcp
+        std::vector<filter::eProtocolID> tcp_ids_1{ filter::eProtocolID::Tcp };
+        std::set<filter::eProtocolID> set_tcp_ids_1{ tcp_ids_1.begin(),
+                                                     tcp_ids_1.end() };
+        struct sock_filter tcp_bpf_code_1[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
+                     ETHER_HDR_LEN + offsetof(struct iphdr, protocol)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Tcp), 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        std::vector<filter::eProtocolID> tcp_ids_2{ filter::eProtocolID::Tcp,
+                                                    filter::eProtocolID::Ip, };
+        std::set<filter::eProtocolID> set_tcp_ids_2{ tcp_ids_2.begin(),
+                                                     tcp_ids_2.end() };
+        struct sock_filter tcp_bpf_code_2[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
+                     ETHER_HDR_LEN + offsetof(struct iphdr, protocol)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Tcp), 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        std::vector<filter::eProtocolID> tcp_ids_5{ filter::eProtocolID::Ip,
+                                                    filter::eProtocolID::Tcp,
+                                                    filter::eProtocolID::Tcp,
+                                                    filter::eProtocolID::Ip,
+                                                    filter::eProtocolID::Tcp, };
+        std::set<filter::eProtocolID> set_tcp_ids_5{ tcp_ids_5.begin(),
+                                                     tcp_ids_5.end() };
+        struct sock_filter tcp_bpf_code_5[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
+                     ETHER_HDR_LEN + offsetof(struct iphdr, protocol)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Tcp), 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        lambda_gen_bpf_code_test(tcp_bpf_code_1, tcp_ids_1);
+        lambda_gen_bpf_code_test(tcp_bpf_code_2, tcp_ids_2);
+        lambda_gen_bpf_code_test(tcp_bpf_code_5, tcp_ids_5);
+    }
+
+    { // tcp & udp & icmp
+        std::vector<filter::eProtocolID> ids_5{ filter::eProtocolID::Ip,
+                                                filter::eProtocolID::Udp,
+                                                filter::eProtocolID::Icmp,
+                                                filter::eProtocolID::Ip,
+                                                filter::eProtocolID::Tcp, };
+        std::set<filter::eProtocolID> set_ids_5{ ids_5.begin(),
+                                                 ids_5.end() };
+        struct sock_filter bpf_code_5[] = {
+            BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
+                     offsetof(struct ether_header, ether_type)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETH_P_IP, 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_LD + BPF_B + BPF_ABS,
+                     ETHER_HDR_LEN + offsetof(struct iphdr, protocol)),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Icmp), 3, 0),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Tcp), 2, 0),
+            BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
+                     static_cast<uint16_t>(filter::eProtocolID::Udp), 1, 0),
+            BPF_STMT(BPF_RET + BPF_K, 0x00),
+            BPF_STMT(BPF_RET + BPF_K, 0xFFFFFFFF),
+        };
+
+        lambda_gen_bpf_code_test(bpf_code_5, ids_5);
+    }
 }
 
 TEST(BPFapture, rule_of_X)
@@ -121,7 +200,7 @@ TEST(BPFapture, rule_of_X)
     using namespace bpfapture;
     namespace bpfapture = ::bpfocket::bpfapture;
 
-    auto lambda_constructor_destructor_test = [](bool promisc) {
+    auto lambda_constructor_destructor_test = [](bool promisc) -> void {
         core::BPFapture sock{ promisc };
         ASSERT_EQ(typeid(sock), typeid(core::BPFapture));
 
@@ -226,8 +305,10 @@ TEST(BPFapture, set_filter)
 {  // ::bpfocket::bpfapture::core
     using namespace bpfapture;
 
+    std::vector<filter::eProtocolID> proto_ids{ filter::eProtocolID::Tcp,
+                                                filter::eProtocolID::Udp };
     core::BPFapture sock{};
-    sock.set_filter(filter::eProtocolID::Tcp);
+    sock.set_filter(proto_ids);
     if (sock.err() != 0)
     {
         std::cerr << sock.err() << std::endl;
@@ -235,7 +316,7 @@ TEST(BPFapture, set_filter)
     }
 
     std::vector<struct sock_filter> filter_vec{
-        filter::gen_bpf_code(filter::eProtocolID::Tcp) };
+        filter::gen_bpf_code(proto_ids) };
 
     struct sock_fprog filter{ sock.filter() };
     ASSERT_EQ(filter.len, filter_vec.size());
@@ -267,12 +348,20 @@ TEST(BPFapture, receive)
     using namespace bpfapture;
 
     core::BPFapture sock{ true };
-    sock.set_filter(filter::eProtocolID::Ip);
-    //sock.set_filter(filter::eProtocolID::Tcp);
-    //sock.set_filter(filter::eProtocolID::Udp);
-    if (sock.err() != 0)
+
+    std::vector<filter::eProtocolID> proto_ids{ filter::eProtocolID::Icmp,
+                                                filter::eProtocolID::Udp, };
+    utils::eResultCode code{ sock.set_filter(proto_ids) };
+    if (code != utils::eResultCode::Success)
     {
-        std::cerr << sock.err() << std::endl;
+        std::ostringstream oss{};
+        oss << "[code: " << static_cast<uint32_t>(code) << "]";
+        if (sock.err() != 0)
+        {
+            oss << "[errno: " << sock.err() << "]";
+        }
+
+        std::cerr << oss.str() << std::endl;
         return;
     }
 
@@ -309,3 +398,4 @@ TEST(BPFapture, receive)
     }
     std::cout << std::endl;
 }
+
