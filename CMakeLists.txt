@@ -14,6 +14,9 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
 endif()
 
+set(CMAKE_DEBUG_POSTFIX "_d")
+set(CMAKE_RELWITHDEBINFO_POSTFIX "_rd")
+
 # Add sub dir
 if(UNIX AND NOT APPLE)
     add_subdirectory(test/)
