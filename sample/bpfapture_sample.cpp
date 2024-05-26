@@ -2,11 +2,21 @@
 ///
 
 #include <iostream>
+#include <csignal>
 
 #include "bpfocket.h"
 
+int quit = 0;
+
+void signal_handler(int)
+{
+    quit = 1;
+}
+
 int main()
 {
+    ::signal(SIGINT, &signal_handler);
+
     namespace utils  = bpfapture::utils;
     namespace filter = bpfapture::filter;
     namespace core   = bpfapture::core;
@@ -16,12 +26,13 @@ int main()
     core::BPFapture sock{ promisc };
 
     // Set filter
-    std::vector<filter::eProtocolID> proto_ids{ filter::eProtocolID::Icmp,
-                                                filter::eProtocolID::Tcp, };
     utils::eResultCode code{};
-    if ((code = sock.set_filter(proto_ids)) != utils::eResultCode::Success)
+    code = sock.set_filter({ filter::eProtocolID::Icmp,
+                             filter::eProtocolID::Tcp });
+    if (code != utils::eResultCode::Success)
     {
-        std::cerr << "result code: "<< static_cast<uint32_t>(code) << std::endl;
+        std::cerr <<
+            "result code: " << static_cast<uint32_t>(code) << std::endl;
         if (sock.err() != 0)
         {
             std::cerr << "errno: " << sock.err() << std::endl;
@@ -35,9 +46,10 @@ int main()
     ssize_t received_bytes = 0;
 
     int max_cnt = 10;
-    while (true && max_cnt--)
+    while (!quit)
     {
-        if ((received_bytes = sock.receive(buf.data(), buf.size())) < 0)
+        received_bytes = sock.receive(buf.data(), buf.size());
+        if (received_bytes < 0)
         {
             std::cerr << sock.err() << std::endl;
             return 2;

@@ -350,7 +350,7 @@ TEST(BPFapture, receive)
     core::BPFapture sock{ true };
 
     std::vector<filter::eProtocolID> proto_ids{ filter::eProtocolID::Icmp,
-                                                filter::eProtocolID::Udp, };
+                                                filter::eProtocolID::Tcp, };
     utils::eResultCode code{ sock.set_filter(proto_ids) };
     if (code != utils::eResultCode::Success)
     {

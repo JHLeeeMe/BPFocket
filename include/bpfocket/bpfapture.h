@@ -111,25 +111,28 @@ namespace core
         auto err()     const -> ssize_t;
 
     private:
-        auto create_fd()   -> utils::eResultCode;
-        auto set_ifname()  -> utils::eResultCode;
-        auto set_promisc() -> utils::eResultCode;
-        auto set_mtu()     -> utils::eResultCode;
+        auto create_fd()      -> utils::eResultCode;
+        auto set_ifname()     -> utils::eResultCode;
+        auto bind_to_device() -> utils::eResultCode;
+        auto set_promisc()    -> utils::eResultCode;
+        auto set_mtu()        -> utils::eResultCode;
         auto set_ifflags(const int16_t flag) -> utils::eResultCode;
         auto get_ifflags()
                 -> std::pair<utils::eResultCode, int16_t>;
         auto get_eth_ifr(const struct ifconf& ifc)
                 -> std::pair<utils::eResultCode, struct ifreq>;
+        
+        static auto cleanup_on_signal(int signal) -> void;
     private:
         int fd_;
-
-        struct ifreq ifr_;
-        int16_t      ifflags_orig_;
-
+        struct ifreq      ifr_;
         struct sock_fprog filter_;
-
         ssize_t err_;
+
+        static int16_t s_ifflags_orig_;
     };
+
+    int16_t BPFapture::s_ifflags_orig_ = -1;
 }  // ::bpfocket::bpfapture::core
 
 
@@ -264,7 +267,6 @@ namespace core
     inline BPFapture::BPFapture(const bool promisc)
         : fd_{ -1 }
         , ifr_{}
-        , ifflags_orig_{}
         , filter_{}
         , err_{}
     {
@@ -283,19 +285,28 @@ namespace core
                     code, err_, __FUNCTION__, "set_ifname()");
             }
 
+            if ((code = bind_to_device()) != utils::eResultCode::Success)
+            {
+                utils::throwRuntimeError(
+                    code, err_, __FUNCTION__, "bind_to_device()");
+            }
+
             if ((code = set_mtu()) != utils::eResultCode::Success)
             {
                 utils::throwRuntimeError(code, err_, __FUNCTION__, "set_mtu()");
             }
 
-            std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
-            if ((code = result.first) != utils::eResultCode::Success)
+            if (s_ifflags_orig_ == -1)
             {
-                utils::throwRuntimeError(
-                    code, err_, __FUNCTION__, "get_ifflags()");
-            }
+                std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
+                if ((code = result.first) != utils::eResultCode::Success)
+                {
+                    utils::throwRuntimeError(
+                        code, err_, __FUNCTION__, "get_ifflags()");
+                }
 
-            ifflags_orig_ = result.second;
+                s_ifflags_orig_ = result.second;
+            }
 
             if (promisc)
             {
@@ -320,14 +331,13 @@ namespace core
             return;
         }
 
-        set_ifflags(ifflags_orig_);
+        set_ifflags(s_ifflags_orig_);
         close(fd_);
     }
 
     inline BPFapture::BPFapture(BPFapture&& other)
         : fd_{ other.fd_ }
         , ifr_{ other.ifr_ }
-        , ifflags_orig_{ other.ifflags_orig_ }
         , filter_{ other.filter_ }
         , err_{ other.err_ }
     {
@@ -341,7 +351,6 @@ namespace core
         {
             fd_ = other.fd_;
             ifr_ = other.ifr_;
-            ifflags_orig_ = other.ifflags_orig_;
             filter_ = other.filter_;
             err_ = other.err_;
 
@@ -469,6 +478,21 @@ namespace core
         return utils::eResultCode::Success;
     }
 
+    inline auto BPFapture::bind_to_device() -> utils::eResultCode
+    {
+        if (::setsockopt(fd_,
+                        SOL_SOCKET,
+                        SO_BINDTODEVICE,
+                        ifr_.ifr_name,
+                        strnlen(ifr_.ifr_name, IFNAMSIZ) + 1) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::SocketSetOptFailed;
+        }
+
+        return utils::eResultCode::Success;
+    }
+
     inline auto BPFapture::get_eth_ifr(const struct ifconf& ifc)
             -> std::pair<utils::eResultCode, struct ifreq>
     {
@@ -532,16 +556,6 @@ namespace core
         {
             err_ = errno;
             return utils::eResultCode::IoctlSetFlagsFailed;
-        }
-
-        if (::setsockopt(fd_,
-                         SOL_SOCKET,
-                         SO_BINDTODEVICE,
-                         ifr_.ifr_name,
-                         strnlen(ifr_.ifr_name, IFNAMSIZ) + 1) < 0)
-        {
-            err_ = errno;
-            return utils::eResultCode::SocketSetOptFailed;
         }
 
         return utils::eResultCode::Success;
