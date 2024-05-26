@@ -20,6 +20,7 @@ set(CMAKE_RELWITHDEBINFO_POSTFIX "_rd")
 # Add sub dir
 if(UNIX AND NOT APPLE)
     add_subdirectory(test/)
+    add_subdirectory(sample/)
 endif()
 
 message("\n###################################################################")
