@@ -82,8 +82,7 @@ namespace filter
 {
     enum class eProtocolID;
 
-    //auto gen_bpf_code(eProtocolID proto_id)
-    auto gen_bpf_code(const std::vector<eProtocolID>& proto_id)
+    auto gen_bpf_code(const std::vector<eProtocolID>& proto_ids)
             -> std::vector<struct sock_filter>;
 }  // ::bpfocket::bpfapture::filter
 
@@ -104,9 +103,9 @@ namespace core
         auto set_filter(const std::vector<filter::eProtocolID>& proto_ids)
                 -> utils::eResultCode;
         auto receive(void* buf, const size_t buf_len) -> ssize_t;
-        auto mtu()     const -> int;
         auto fd()      const -> int;
         auto ifname()  const -> std::string;
+        auto mtu()     const -> int;
         auto filter()  const -> struct sock_fprog;
         auto err()     const -> ssize_t;
 
@@ -114,18 +113,16 @@ namespace core
         auto create_fd()      -> utils::eResultCode;
         auto set_ifname()     -> utils::eResultCode;
         auto bind_to_device() -> utils::eResultCode;
-        auto set_promisc()    -> utils::eResultCode;
         auto set_mtu()        -> utils::eResultCode;
+        auto set_promisc()    -> utils::eResultCode;
         auto set_ifflags(const int16_t flag) -> utils::eResultCode;
         auto get_ifflags()
                 -> std::pair<utils::eResultCode, int16_t>;
         auto get_eth_ifr(const struct ifconf& ifc)
                 -> std::pair<utils::eResultCode, struct ifreq>;
-        
-        static auto cleanup_on_signal(int signal) -> void;
     private:
         int fd_;
-        struct ifreq      ifr_;
+        struct ifreq ifr_;
         struct sock_fprog filter_;
         ssize_t err_;
 
@@ -416,6 +413,11 @@ namespace core
         return ifr_.ifr_name;
     }
 
+    inline auto BPFapture::mtu() const -> int
+    {
+        return ifr_.ifr_mtu;
+    }
+
     inline auto BPFapture::filter() const -> struct sock_fprog
     {
         return filter_;
@@ -493,6 +495,54 @@ namespace core
         return utils::eResultCode::Success;
     }
 
+    inline auto BPFapture::set_mtu() -> utils::eResultCode
+    {
+        if (::ioctl(fd_, SIOCGIFMTU, &ifr_) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::IoctlSetMtuFailed;
+        }
+
+        return utils::eResultCode::Success;
+    }
+
+    inline auto BPFapture::set_promisc() -> utils::eResultCode
+    {
+        std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
+        if (result.first != utils::eResultCode::Success)
+        {
+            return result.first;
+        }
+
+        return set_ifflags(result.second | IFF_PROMISC);
+    }
+
+    inline auto BPFapture::set_ifflags(const int16_t flags) -> utils::eResultCode
+    {
+        ifr_.ifr_flags = flags;
+
+        if (::ioctl(fd_, SIOCSIFFLAGS, &ifr_) < 0)
+        {
+            err_ = errno;
+            return utils::eResultCode::IoctlSetFlagsFailed;
+        }
+
+        return utils::eResultCode::Success;
+    }
+
+    inline auto BPFapture::get_ifflags()
+            -> std::pair<utils::eResultCode, int16_t>
+    {
+        struct ifreq ifr_tmp{ ifr_ };
+        if (::ioctl(fd_, SIOCGIFFLAGS, &ifr_tmp) < 0)
+        {
+            err_ = errno;
+            return { utils::eResultCode::IoctlGetFlagsFailed, {} };
+        }
+
+        return { utils::eResultCode::Success, ifr_tmp.ifr_flags };
+    }
+
     inline auto BPFapture::get_eth_ifr(const struct ifconf& ifc)
             -> std::pair<utils::eResultCode, struct ifreq>
     {
@@ -533,59 +583,6 @@ namespace core
         }
 
         return { utils::eResultCode::InterfaceNotFound, {} };
-    }
-
-    inline auto BPFapture::get_ifflags()
-            -> std::pair<utils::eResultCode, int16_t>
-    {
-        struct ifreq ifr_tmp{ ifr_ };
-        if (::ioctl(fd_, SIOCGIFFLAGS, &ifr_tmp) < 0)
-        {
-            err_ = errno;
-            return { utils::eResultCode::IoctlGetFlagsFailed, {} };
-        }
-
-        return { utils::eResultCode::Success, ifr_tmp.ifr_flags };
-    }
-
-    inline auto BPFapture::set_ifflags(const int16_t flags) -> utils::eResultCode
-    {
-        ifr_.ifr_flags = flags;
-
-        if (::ioctl(fd_, SIOCSIFFLAGS, &ifr_) < 0)
-        {
-            err_ = errno;
-            return utils::eResultCode::IoctlSetFlagsFailed;
-        }
-
-        return utils::eResultCode::Success;
-    }
-
-    inline auto BPFapture::set_promisc() -> utils::eResultCode
-    {
-        std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
-        if (result.first != utils::eResultCode::Success)
-        {
-            return result.first;
-        }
-
-        return set_ifflags(result.second | IFF_PROMISC);
-    }
-
-    inline auto BPFapture::set_mtu() -> utils::eResultCode
-    {
-        if (::ioctl(fd_, SIOCGIFMTU, &ifr_) < 0)
-        {
-            err_ = errno;
-            return utils::eResultCode::IoctlSetMtuFailed;
-        }
-
-        return utils::eResultCode::Success;
-    }
-
-    inline auto BPFapture::mtu() const -> int
-    {
-        return ifr_.ifr_mtu;
     }
 }  // ::bpfocket::bpfapture::core
 
