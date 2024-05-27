@@ -12,21 +12,25 @@ file(GLOB_RECURSE HDR_G
     ${CMAKE_SOURCE_DIR}/include/*.hpp
 )
 
-# Create Target (BPFocket_Sample)
-add_executable(BPFocket_Sample
-    ${SRC_G}
-    ${HDR_G}
-)
+foreach(SOURCE_FILE ${SRC_G})
+    get_filename_component(SOURCE_NAME ${SOURCE_FILE} NAME_WE)
 
-# Set target postfix
-set_target_properties(BPFocket_Sample
-    PROPERTIES
-        DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
-        RELWITHDEBINFO_POSTFIX ${CMAKE_RELWITHDEBINFO_POSTFIX}
-)
+    # Create Target
+    add_executable(${SOURCE_NAME}
+        ${SOURCE_FILE}
+        ${HDR_G}
+    )
 
-# -I
-target_include_directories(BPFocket_Sample
-    PUBLIC
-        ${CMAKE_SOURCE_DIR}/include
-)
+    # Set target postfix
+    set_target_properties(${SOURCE_NAME}
+        PROPERTIES
+            DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+            RELWITHDEBINFO_POSTFIX ${CMAKE_RELWITHDEBINFO_POSTFIX}
+    )
+
+    # -I
+    target_include_directories(${SOURCE_NAME}
+        PUBLIC
+            ${CMAKE_SOURCE_DIR}/include
+    )
+endforeach()
