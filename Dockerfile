@@ -7,6 +7,7 @@ RUN apt-get -y update && \
     apt-get -y upgrade && \
     apt-get -y --no-install-recommends install \
         build-essential \
+        gdb \
         cmake \
         net-tools \
         tree \
