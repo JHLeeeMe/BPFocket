@@ -8,6 +8,6 @@ docker run \
     -v $(pwd):/app \
     --net=host \
     --cap-add=NET_ADMIN \
-    --name BPFocket-cpp_dev \
-    jhleeeme/cpp:dev \
+    --name BPFocket \
+    jhleeeme/cpp:dev-alpine \
     bin/bash

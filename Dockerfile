@@ -1,14 +1,16 @@
-FROM jhleeeme/ubuntu:20.04
+FROM alpine:latest
 LABEL maintainer="JHLeeeMe" \
       description="C++ dev-container"
 
-ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get -y --no-install-recommends install \
-        build-essential \
+RUN apk update && \
+    apk upgrade
+
+RUN apk add --no-cache \
+        build-base \
+        linux-headers \
         gdb \
         cmake \
+        bash \
         net-tools \
-        tree \
-        git
+        git \
+        tree
