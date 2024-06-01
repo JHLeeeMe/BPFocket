@@ -348,6 +348,7 @@ TEST(BPFapture, receive)
     using namespace bpfapture;
 
     core::BPFapture sock{ true };
+    int system_mtu = sock.mtu();
 
     std::vector<filter::eProtocolID> proto_ids{ filter::eProtocolID::Icmp,
                                                 filter::eProtocolID::Tcp, };
@@ -365,6 +366,7 @@ TEST(BPFapture, receive)
         return;
     }
 
+    ASSERT_EQ(system_mtu, sock.mtu());
     std::vector<uint8_t> buf(sock.mtu());
     ssize_t received_bytes = 0;
 

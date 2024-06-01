@@ -124,6 +124,7 @@ namespace core
     private:
         int fd_;
         struct ifreq ifr_;
+        int mtu_;
         struct sock_fprog filter_;
         ssize_t err_;
 
@@ -265,6 +266,7 @@ namespace core
     inline BPFapture::BPFapture(const bool promisc)
         : fd_{ -1 }
         , ifr_{}
+        , mtu_{}
         , filter_{}
         , err_{}
     {
@@ -336,6 +338,7 @@ namespace core
     inline BPFapture::BPFapture(BPFapture&& other) noexcept
         : fd_{ other.fd_ }
         , ifr_{ other.ifr_ }
+        , mtu_{ other.mtu_ }
         , filter_{ other.filter_ }
         , err_{ other.err_ }
     {
@@ -349,6 +352,7 @@ namespace core
         {
             fd_ = other.fd_;
             ifr_ = other.ifr_;
+            mtu_ = other.mtu_;
             filter_ = other.filter_;
             err_ = other.err_;
 
@@ -416,7 +420,7 @@ namespace core
 
     inline auto BPFapture::mtu() const -> int
     {
-        return ifr_.ifr_mtu;
+        return mtu_;
     }
 
     inline auto BPFapture::filter() const -> struct sock_fprog
@@ -484,10 +488,10 @@ namespace core
     inline auto BPFapture::bind_to_device() -> utils::eResultCode
     {
         if (::setsockopt(fd_,
-                        SOL_SOCKET,
-                        SO_BINDTODEVICE,
-                        ifr_.ifr_name,
-                        strnlen(ifr_.ifr_name, IFNAMSIZ) + 1) < 0)
+                         SOL_SOCKET,
+                         SO_BINDTODEVICE,
+                         ifr_.ifr_name,
+                         strnlen(ifr_.ifr_name, IFNAMSIZ) + 1) < 0)
         {
             err_ = errno;
             return utils::eResultCode::SocketSetOptFailed;
@@ -498,11 +502,14 @@ namespace core
 
     inline auto BPFapture::set_mtu() -> utils::eResultCode
     {
-        if (::ioctl(fd_, SIOCGIFMTU, &ifr_) < 0)
+        struct ifreq ifr_tmp{ ifr_ };
+        if (::ioctl(fd_, SIOCGIFMTU, &ifr_tmp) < 0)
         {
             err_ = errno;
             return utils::eResultCode::IoctlSetMtuFailed;
         }
+
+        mtu_ = ifr_tmp.ifr_mtu;
 
         return utils::eResultCode::Success;
     }
