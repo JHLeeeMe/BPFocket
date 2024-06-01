@@ -49,6 +49,7 @@
 #include <arpa/inet.h>     // inet_ntoa()
 #include <unistd.h>        // close()
 
+#include <cstdint>    // uint*_t
 #include <cstring>    // strnlen()
 #include <stdexcept>  // std::runtime_error()
 #include <sstream>    // std::ostringstream()
@@ -97,8 +98,8 @@ namespace core
         BPFapture(const BPFapture&) = delete;
         BPFapture& operator=(const BPFapture&) = delete;
 
-        BPFapture(BPFapture&& other);
-        BPFapture& operator=(BPFapture&& other);
+        BPFapture(BPFapture&& other) noexcept;
+        BPFapture& operator=(BPFapture&& other) noexcept;
     public:
         auto set_filter(const std::vector<filter::eProtocolID>& proto_ids)
                 -> utils::eResultCode;
@@ -115,7 +116,7 @@ namespace core
         auto bind_to_device() -> utils::eResultCode;
         auto set_mtu()        -> utils::eResultCode;
         auto set_promisc()    -> utils::eResultCode;
-        auto set_ifflags(const int16_t flag) -> utils::eResultCode;
+        auto set_ifflags(const int16_t flags) -> utils::eResultCode;
         auto get_ifflags()
                 -> std::pair<utils::eResultCode, int16_t>;
         auto get_eth_ifr(const struct ifconf& ifc)
@@ -332,17 +333,17 @@ namespace core
         close(fd_);
     }
 
-    inline BPFapture::BPFapture(BPFapture&& other)
+    inline BPFapture::BPFapture(BPFapture&& other) noexcept
         : fd_{ other.fd_ }
-        , ifr_{ other.ifr_ }
-        , filter_{ other.filter_ }
-        , err_{ other.err_ }
+          , ifr_{ other.ifr_ }
+          , filter_{ other.filter_ }
+          , err_{ other.err_ }
     {
         other.fd_ = -1;
         other.err_ = 0;
     }
 
-    inline BPFapture& BPFapture::operator=(BPFapture&& other)
+    inline BPFapture& BPFapture::operator=(BPFapture&& other) noexcept
     {
         if (this != &other)
         {
