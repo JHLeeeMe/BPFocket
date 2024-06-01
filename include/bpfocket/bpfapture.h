@@ -335,9 +335,9 @@ namespace core
 
     inline BPFapture::BPFapture(BPFapture&& other) noexcept
         : fd_{ other.fd_ }
-          , ifr_{ other.ifr_ }
-          , filter_{ other.filter_ }
-          , err_{ other.err_ }
+        , ifr_{ other.ifr_ }
+        , filter_{ other.filter_ }
+        , err_{ other.err_ }
     {
         other.fd_ = -1;
         other.err_ = 0;
