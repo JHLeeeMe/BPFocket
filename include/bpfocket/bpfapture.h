@@ -25,7 +25,7 @@
 ///     }
 /// }
 /// }
-/// using bpfapture = ::bpfocket::bpfapture;
+/// namespace bpfapture = ::bpfocket::bpfapture;
 ///
 /// ----------------------------------------------------------------------------
 /// License: The Unlicense <https://unlicense.org/>
