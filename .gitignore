@@ -398,6 +398,8 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Custom
+.idea/
 .vscode/
 build/
 out/
+cmake-*/

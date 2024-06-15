@@ -128,10 +128,12 @@ namespace core
         struct sock_fprog filter_;
         ssize_t err_;
 
-        static int16_t s_ifflags_orig_;
+        static int16_t& s_ifflags_orig_ref()
+        {
+            static int16_t s_ifflags_orig_ = -1;
+            return s_ifflags_orig_;
+        }
     };
-
-    int16_t BPFapture::s_ifflags_orig_ = -1;
 }  // ::bpfocket::bpfapture::core
 
 
@@ -296,7 +298,7 @@ namespace core
                 utils::throwRuntimeError(code, err_, __FUNCTION__, "set_mtu()");
             }
 
-            if (s_ifflags_orig_ == -1)
+            if (s_ifflags_orig_ref() == -1)
             {
                 std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
                 if ((code = result.first) != utils::eResultCode::Success)
@@ -305,7 +307,7 @@ namespace core
                         code, err_, __FUNCTION__, "get_ifflags()");
                 }
 
-                s_ifflags_orig_ = result.second;
+                s_ifflags_orig_ref() = result.second;
             }
 
             if (promisc)
@@ -331,7 +333,7 @@ namespace core
             return;
         }
 
-        set_ifflags(s_ifflags_orig_);
+        set_ifflags(s_ifflags_orig_ref());
         close(fd_);
     }
 
