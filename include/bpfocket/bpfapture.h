@@ -57,10 +57,10 @@
 #include <vector>     // std::vector
 #include <set>        // std::set
 
-#define __BPFOCKET_BEGIN namespace bpfocket {
-#define __BPFOCKET_END   }
+#define BPFOCKET_BEGIN_ namespace bpfocket {
+#define BPFOCKET_END_   }
 
-__BPFOCKET_BEGIN
+BPFOCKET_BEGIN_
 namespace bpfapture
 {
 
@@ -92,7 +92,7 @@ namespace core
     class BPFapture
     {
     public:  // rule of 5
-        BPFapture(const bool promisc = false);
+        explicit BPFapture(const bool promisc = false);
         ~BPFapture();
 
         BPFapture(const BPFapture&) = delete;
@@ -518,13 +518,13 @@ namespace core
 
     inline auto BPFapture::set_promisc() -> utils::eResultCode
     {
-        std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
+        const std::pair<utils::eResultCode, int16_t> result{ get_ifflags() };
         if (result.first != utils::eResultCode::Success)
         {
             return result.first;
         }
 
-        return set_ifflags(result.second | IFF_PROMISC);
+        return set_ifflags(IFF_PROMISC | result.second);
     }
 
     inline auto BPFapture::set_ifflags(const int16_t flags) -> utils::eResultCode
@@ -597,7 +597,7 @@ namespace core
 }  // ::bpfocket::bpfapture::core
 
 }  // ::bpfocket::bpfapture
-__BPFOCKET_END
+BPFOCKET_END_
 
 
 /// ============================================================================

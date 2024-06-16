@@ -22,7 +22,7 @@ int main()
     namespace core   = bpfapture::core;
 
     // Create BPFapture
-    const bool promisc = true;
+    constexpr bool promisc = true;
     core::BPFapture sock{ promisc };
 
     // Set filter
@@ -45,8 +45,8 @@ int main()
     std::vector<uint8_t> buf(sock.mtu());
     ssize_t received_bytes = 0;
 
-    int max_cnt = 10;
-    while (!quit)
+    int max_cnt = 1000;
+    while (!quit || max_cnt--)
     {
         received_bytes = sock.receive(buf.data(), buf.size());
         if (received_bytes < 0)
@@ -62,7 +62,7 @@ int main()
                 std::cout << std::endl;
             }
 
-            uint8_t c = buf[i];
+            const uint8_t c = buf[i];
             if (c > 32 && c < 126 )
             {
                 printf("%c", c);

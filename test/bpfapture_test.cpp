@@ -1,6 +1,8 @@
 /// bpfapture_test.cpp
 ///
 
+// ReSharper disable CppDFAUnusedValue
+
 #include <fcntl.h>  // fcntl()
 
 #include <iostream>
@@ -15,7 +17,7 @@ TEST(ioctl, getconf)
     using namespace bpfapture;
 
     core::BPFapture sock{ false };
-    int sockfd = sock.fd();
+    const int sockfd = sock.fd();
 
     struct ifconf ifc{};
     ifc.ifc_len = 0;
@@ -49,7 +51,7 @@ TEST(throwRuntimeError, all)
 {  // ::bpfocket::bpfapture::utils
     using namespace bpfapture;
 
-    ssize_t err_no = 1;
+    constexpr ssize_t err_no = 1;
 
     ASSERT_THROW(
         utils::throwRuntimeError(
@@ -63,10 +65,10 @@ TEST(gen_bpf_code, all)
     using namespace bpfapture;
 
     auto lambda_gen_bpf_code_test =
-        [](struct sock_filter* expected_arr,
-           std::vector<filter::eProtocolID> proto_ids) -> void
+        [](const struct sock_filter* expected_arr,
+           const std::vector<filter::eProtocolID>& proto_ids) -> void
         {
-            std::vector<struct sock_filter> generated_vec{
+            const std::vector<struct sock_filter> generated_vec{
                 filter::gen_bpf_code(proto_ids) };
 
             for (size_t i = 0; i < generated_vec.size(); i++)
@@ -318,7 +320,7 @@ TEST(BPFapture, set_filter)
     std::vector<struct sock_filter> filter_vec{
         filter::gen_bpf_code(proto_ids) };
 
-    struct sock_fprog filter{ sock.filter() };
+    const struct sock_fprog filter{ sock.filter() };
     ASSERT_EQ(filter.len, filter_vec.size());
 }
 
@@ -330,7 +332,7 @@ TEST(BPFapture, set_mtu)
     using namespace bpfapture;
 
     core::BPFapture sock{};
-    int sockfd = sock.fd();
+    const int sockfd = sock.fd();
 
     struct ifreq ifr{};
     strncpy(ifr.ifr_name, sock.ifname().c_str(), sock.ifname().length());
@@ -371,7 +373,7 @@ TEST(BPFapture, receive)
     ssize_t received_bytes = 0;
 
     int max_cnt = 10;
-    while (true && max_cnt--)
+    while (max_cnt--)
     {
         if ((received_bytes = sock.receive(buf.data(), buf.size())) < 0)
         {
