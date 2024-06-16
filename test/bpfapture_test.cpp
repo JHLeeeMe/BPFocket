@@ -317,11 +317,11 @@ TEST(BPFapture, set_filter)
         return;
     }
 
-    std::vector<struct sock_filter> filter_vec{
+    const std::vector<struct sock_filter> generated_filters{
         filter::gen_bpf_code(proto_ids) };
 
-    const struct sock_fprog filter{ sock.filter() };
-    ASSERT_EQ(filter.len, filter_vec.size());
+    const std::vector<struct sock_filter> filters{ sock.filters() };
+    ASSERT_EQ(filters.size(), generated_filters.size());
 }
 
 TEST(BPFapture, set_mtu)
