@@ -107,7 +107,7 @@ namespace core
         auto fd()      const -> int;
         auto ifname()  const -> std::string;
         auto mtu()     const -> int;
-        auto filter()  const -> struct sock_fprog;
+        auto filters() const -> std::vector<struct sock_filter>;
         auto err()     const -> ssize_t;
 
     private:
@@ -125,7 +125,7 @@ namespace core
         int fd_;
         struct ifreq ifr_;
         int mtu_;
-        struct sock_fprog filter_;
+        std::vector<struct sock_filter> filters_;
         ssize_t err_;
 
         static int16_t& s_ifflags_orig_ref()
@@ -269,7 +269,7 @@ namespace core
         : fd_{ -1 }
         , ifr_{}
         , mtu_{}
-        , filter_{}
+        , filters_{}
         , err_{}
     {
         utils::eResultCode code{};
@@ -341,7 +341,7 @@ namespace core
         : fd_{ other.fd_ }
         , ifr_{ other.ifr_ }
         , mtu_{ other.mtu_ }
-        , filter_{ other.filter_ }
+        , filters_{ std::move(other.filters_) }
         , err_{ other.err_ }
     {
         other.fd_ = -1;
@@ -355,7 +355,7 @@ namespace core
             fd_ = other.fd_;
             ifr_ = other.ifr_;
             mtu_ = other.mtu_;
-            filter_ = other.filter_;
+            filters_ = std::move(other.filters_);
             err_ = other.err_;
 
             other.fd_ = -1;
@@ -375,21 +375,21 @@ namespace core
     {
         err_ = 0;
 
-        std::vector<struct sock_filter> bpf_code{
-            filter::gen_bpf_code(proto_ids) };
-        if (bpf_code.empty())
+        filters_ = filter::gen_bpf_code(proto_ids);
+        if (filters_.empty())
         {
             return utils::eResultCode::Failure;
         }
 
-        filter_.len = bpf_code.size();
-        filter_.filter = bpf_code.data();
+        struct sock_fprog fprog{};
+        fprog.len = filters_.size();
+        fprog.filter = filters_.data();
 
         if (::setsockopt(fd_,
                          SOL_SOCKET,
                          SO_ATTACH_FILTER,
-                         &filter_,
-                         sizeof(filter_)) < 0)
+                         &fprog,
+                         sizeof(fprog)) < 0)
         {
             err_ = errno;
             return utils::eResultCode::SocketSetOptFailed;
@@ -400,7 +400,7 @@ namespace core
 
     inline auto BPFapture::receive(void* buf, const size_t buf_len) -> ssize_t
     {
-        ssize_t received_bytes =
+        const ssize_t received_bytes =
             ::recvfrom(fd_, buf, buf_len, 0, nullptr, nullptr);
         if (received_bytes < 0)
         {
@@ -425,9 +425,9 @@ namespace core
         return mtu_;
     }
 
-    inline auto BPFapture::filter() const -> struct sock_fprog
+    inline auto BPFapture::filters() const -> std::vector<struct sock_filter>
     {
-        return filter_;
+        return filters_;
     }
 
     inline auto BPFapture::err() const -> ssize_t
